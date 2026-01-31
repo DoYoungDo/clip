@@ -10,9 +10,9 @@ import (
 	"golang.design/x/clipboard"
 )
 
-func startMonitor(history *History, onUpdate func()) {
+func startMonitor(reader func(*ClipItem), writer chan *ClipItem) {
 	time.Sleep(time.Second)
-	
+
 	if err := clipboard.Init(); err != nil {
 		return
 	}
@@ -20,15 +20,21 @@ func startMonitor(history *History, onUpdate func()) {
 	var lastText []byte
 	var lastImage []byte
 	var lastFilePath string
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
+
+	go func() {
+		for item := range writer {
+			clipboard.Write(Ifel(item.Type == TypeImage, clipboard.FmtImage, clipboard.FmtText), item.Content)
+		}
+	}()
 
 	for range ticker.C {
 		// 先检查是否有文件
 		filePath := getFilePath()
 		if filePath != "" {
 			if filePath != lastFilePath {
-				history.Add(&ClipItem{
+				reader(&ClipItem{
 					Type:     TypeFile,
 					Content:  []byte(filePath),
 					Text:     filePath,
@@ -37,9 +43,6 @@ func startMonitor(history *History, onUpdate func()) {
 				})
 				lastFilePath = filePath
 				lastText = nil
-				if onUpdate != nil {
-					onUpdate()
-				}
 			}
 			continue
 		} else {
@@ -54,7 +57,7 @@ func startMonitor(history *History, onUpdate func()) {
 			itemType := TypeText
 			displayText := textStr
 			filePath := ""
-			
+
 			// 检查是否是 file:// 格式（Linux）
 			if strings.HasPrefix(textStr, "file://") {
 				itemType = TypeFile
@@ -62,36 +65,30 @@ func startMonitor(history *History, onUpdate func()) {
 				filePath = strings.TrimSpace(filePath)
 				displayText = filePath
 			}
-			
-			history.Add(&ClipItem{
+
+			reader(&ClipItem{
 				Type:     itemType,
 				Content:  append([]byte(nil), text...),
 				Text:     displayText,
 				FilePath: filePath,
 				Time:     time.Now(),
 			})
-			
+
 			lastText = append([]byte(nil), text...)
-			if onUpdate != nil {
-				onUpdate()
-			}
 		}
 
 		// 监听图片
 		image := clipboard.Read(clipboard.FmtImage)
 		if len(image) > 0 && !bytes.Equal(image, lastImage) {
 			hash := fmt.Sprintf("%x", md5.Sum(image))
-			history.Add(&ClipItem{
+			reader(&ClipItem{
 				Type:     TypeImage,
 				Content:  append([]byte(nil), image...),
 				Text:     fmt.Sprintf("图片 [%s]", hash[:8]), // 显示前8位MD5
-				FilePath: hash, // 完整 MD5 用于去重
+				FilePath: hash,                             // 完整 MD5 用于去重
 				Time:     time.Now(),
 			})
 			lastImage = append([]byte(nil), image...)
-			if onUpdate != nil {
-				onUpdate()
-			}
 		}
 	}
 }
