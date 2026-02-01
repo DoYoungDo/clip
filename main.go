@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"crypto/md5"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/energye/systray"
+	"golang.design/x/clipboard"
 )
 
 type ClearState int
@@ -14,8 +19,9 @@ const (
 )
 
 var (
-	config_max         = 50
-	global_clear_state = Normal
+	config_max           = 50
+	global_clear_state   = Normal
+	config_single_delete = false
 )
 
 // func formatMenuItem(item *ClipItem) string {
@@ -66,7 +72,7 @@ func formatMenuItem(item *ClipItem) string {
 		t = prefix + " [empty]"
 	}
 
-	fmt.Println("formatMenuItem:", t)
+	// fmt.Println("formatMenuItem:", t)
 	return t
 }
 
@@ -89,23 +95,119 @@ func truncateStringFromEnd(s string, maxLen int) string {
 	return "..." + string(runes[len(runes)-(maxLen-3):])
 }
 
+func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
+	time.Sleep(time.Second)
+
+	if err := clipboard.Init(); err != nil {
+		return nil, nil, err
+	}
+
+	reader := make(chan *ClipItem, 1)
+	writer := make(chan *ClipItem, 1)
+
+	go func() {
+		for item := range writer {
+			clipboard.Write(Ifel(item.Type == TypeImage, clipboard.FmtImage, clipboard.FmtText), item.Content)
+		}
+	}()
+
+	go func() {
+		var lastText []byte
+		var lastImage []byte
+		var lastFilePath string
+
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			// 先检查是否有文件
+			filePath := getFilePath()
+			if filePath != "" {
+				if filePath != lastFilePath {
+					reader <- &ClipItem{
+						Type:     TypeFile,
+						Content:  []byte(filePath),
+						Text:     filePath,
+						FilePath: filePath,
+						Time:     time.Now(),
+					}
+					lastFilePath = filePath
+					lastText = nil
+				}
+				continue
+			} else {
+				// 没有文件时清空文件缓存
+				lastFilePath = ""
+			}
+
+			// 监听文本
+			text := clipboard.Read(clipboard.FmtText)
+			if len(text) > 0 && !bytes.Equal(text, lastText) {
+				textStr := string(text)
+				itemType := TypeText
+				displayText := textStr
+				filePath := ""
+
+				// 检查是否是 file:// 格式（Linux）
+				if strings.HasPrefix(textStr, "file://") {
+					itemType = TypeFile
+					filePath = strings.TrimPrefix(textStr, "file://")
+					filePath = strings.TrimSpace(filePath)
+					displayText = filePath
+				}
+
+				reader <- &ClipItem{
+					Type:     itemType,
+					Content:  append([]byte(nil), text...),
+					Text:     displayText,
+					FilePath: filePath,
+					Time:     time.Now(),
+				}
+
+				lastText = append([]byte(nil), text...)
+			}
+
+			// 监听图片
+			image := clipboard.Read(clipboard.FmtImage)
+			if len(image) > 0 && !bytes.Equal(image, lastImage) {
+				hash := fmt.Sprintf("%x", md5.Sum(image))
+				reader <- &ClipItem{
+					Type:     TypeImage,
+					Content:  append([]byte(nil), image...),
+					Text:     fmt.Sprintf("图片 [%s]", hash[:8]), // 显示前8位MD5
+					FilePath: hash,                             // 完整 MD5 用于去重
+					Time:     time.Now(),
+				}
+				lastImage = append([]byte(nil), image...)
+			}
+		}
+	}()
+
+	return reader, writer, nil
+}
+
 func main() {
 	history := NewHistory(config_max)
 	writer := make(chan *ClipItem)
 
-	groups := make(map[string]struct {
-		active  *bool
-		history *History
-	})
+	groups := make(map[string]*Group)
 
-	go startMonitor(func(item *ClipItem) {
-		history.Add(item)
-		for _, group := range groups {
-			if *group.active {
-				group.history.Add(item)
+	reader, writer, err := startMonitor()
+	if err != nil {
+		return
+	}
+
+	go func() {
+		for item := range reader {
+			history.Add(item)
+
+			for _, group := range groups {
+				if group.Active {
+					group.History.Add(item)
+				}
 			}
 		}
-	}, writer)
+	}()
 
 	systray.Run(func() {
 		systray.SetIcon(iconData)
@@ -123,11 +225,18 @@ func main() {
 		}
 
 		addHistoryMenuAction := func() {
-			for _, item := range history.GetAll() {
+			for i, item := range history.GetAll() {
 				menu := systray.AddMenuItem(formatMenuItem(item), item.Text)
 				menu.Click(func() {
 					writer <- item
 				})
+
+				if config_single_delete {
+					del := menu.AddSubMenuItem("删除", "")
+					del.Click(func() {
+						history.Delete(i)
+					})
+				}
 			}
 		}
 
@@ -138,25 +247,19 @@ func main() {
 				if top == nil {
 					return
 				}
-				groups[top.Text] = struct {
-					active  *bool
-					history *History
-				}{
-					active:  BoolPtr(false),
-					history: NewHistory(config_max),
-				}
+				groups[top.Text] = NewGroup(top.Text, true, config_max)
 			})
 		}
 
 		addGroupMenuAction := func() {
 			for name, group := range groups {
-				menu := systray.AddMenuItemCheckbox(name, "", *group.active)
+				menu := systray.AddMenuItemCheckbox(name, "", group.Active)
 
-				btnActive := menu.AddSubMenuItem("激活/取消激活分组", "")
+				btnActive := menu.AddSubMenuItemCheckbox("激活/取消激活分组", "", group.Active)
 				btnRename := menu.AddSubMenuItem("重命名", "")
 				btnDelete := menu.AddSubMenuItem("删除分组", "")
 				btnActive.Click(func() {
-					*group.active = !*group.active
+					group.Active = !group.Active
 				})
 				btnRename.Click(func() {
 					top := history.GetTop()
@@ -170,7 +273,7 @@ func main() {
 					delete(groups, name)
 				})
 
-				for _, item := range group.history.GetAll() {
+				for _, item := range group.History.GetAll() {
 					menu := menu.AddSubMenuItem(formatMenuItem(item), item.Text)
 					menu.Click(func() {
 						writer <- item
@@ -198,6 +301,14 @@ func main() {
 			}
 		}
 
+		addConfigMenuAction := func() {
+			menu := systray.AddMenuItem("配置", "")
+			btnSingleDelete := menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete)
+			btnSingleDelete.Click(func() {
+				config_single_delete = !config_single_delete
+			})
+		}
+
 		readyAndShow := func(menu systray.IMenu) {
 			systray.ResetMenu()
 
@@ -208,6 +319,8 @@ func main() {
 			addGroupMenuAction()
 			addSeparator()
 			addCreateGroupMenuCmd()
+			addSeparator()
+			addConfigMenuAction()
 			addSeparator()
 			addQuitMenuCmd()
 

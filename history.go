@@ -74,3 +74,29 @@ func (h *History) Clear() {
 
 	h.items = []*ClipItem{}
 }
+
+func (h *History) Delete(index int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if index < 0 || index >= len(h.items) {
+		return
+	}
+	h.items = append(h.items[:index], h.items[index+1:]...)
+}
+
+type Group struct {
+	Name         string
+	Active       bool
+	History      *History
+	SingleDelete bool
+}
+
+func NewGroup(name string, active bool, maxSize int) *Group {
+	return &Group{
+		Name:         name,
+		Active:       active,
+		History:      NewHistory(maxSize),
+		SingleDelete: false,
+	}
+}
