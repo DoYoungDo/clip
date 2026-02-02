@@ -26,35 +26,14 @@ const (
 )
 
 var (
-	config_max           = 50
-	config_single_delete = false
 	global_clear_state   = Normal
 	global_show_menu_state = Click
 )
 
-// func formatMenuItem(item *ClipItem) string {
-// 	text := item.Text
-// 	var prefix string
-
-// 	switch item.Type {
-// 	case TypeText:
-// 		prefix = "📝"
-// 		if len(text) > 40 {
-// 			text = text[:40] + "..."
-// 		}
-// 	case TypeImage:
-// 		prefix = "🖼️"
-// 	case TypeFile:
-// 		prefix = "📁"
-// 		if len(text) > 50 {
-// 			text = "..." + text[len(text)-47:]
-// 		}
-// 	}
-
-// 	t := fmt.Sprintf("%s [%s] %s", prefix, item.Time.Format("15:04"), text)
-// 	fmt.Println("formatMenuItem:", t)
-// 	return t
-// }
+var (
+	config_max           = 50
+	config_single_delete = false
+)
 
 func formatMenuItem(item *ClipItem) string {
 	text := item.Text
@@ -277,7 +256,7 @@ func main() {
 
 		addGroupMenuAction := func() {
 			for name, group := range groups {
-				menu := systray.AddMenuItemCheckbox(name, "", group.Active)
+				menu := systray.AddMenuItemCheckbox("📂" + name, "", group.Active)
 
 				if global_show_menu_state == RClick{
 					btnActive := menu.AddSubMenuItemCheckbox("激活/取消激活分组", "", group.Active)
@@ -314,7 +293,7 @@ func main() {
 								writer <- item
 							})
 							del.Click(func() {
-								history.Delete(i)
+								group.History.Delete(i)
 							})
 						}else {
 							menu.Click(func() {
@@ -325,7 +304,7 @@ func main() {
 				}
 			}
 
-			if len(groups) > 0{
+			if global_show_menu_state == RClick && len(groups) > 0{
 				addSeparator()
 			}
 		}
@@ -367,7 +346,6 @@ func main() {
 
 			addHistoryMenuAction()
 			addGroupMenuAction()
-			addQuitMenuCmd()
 
 			menu.ShowMenu()
 		})
