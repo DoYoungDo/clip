@@ -279,29 +279,49 @@ func main() {
 			for name, group := range groups {
 				menu := systray.AddMenuItemCheckbox(name, "", group.Active)
 
-				btnActive := menu.AddSubMenuItemCheckbox("激活/取消激活分组", "", group.Active)
-				btnRename := menu.AddSubMenuItem("重命名", "")
-				btnDelete := menu.AddSubMenuItem("删除分组", "")
-				btnActive.Click(func() {
-					group.Active = !group.Active
-				})
-				btnRename.Click(func() {
-					top := history.GetTop()
-					if top == nil {
-						return
-					}
-					groups[top.Text] = group
-					delete(groups, name)
-				})
-				btnDelete.Click(func() {
-					delete(groups, name)
-				})
-
-				for _, item := range group.History.GetAll() {
-					menu := menu.AddSubMenuItem(formatMenuItem(item), item.Text)
-					menu.Click(func() {
-						writer <- item
+				if global_show_menu_state == RClick{
+					btnActive := menu.AddSubMenuItemCheckbox("激活/取消激活分组", "", group.Active)
+					btnRename := menu.AddSubMenuItem("重命名", "")
+					btnDelete := menu.AddSubMenuItem("删除分组", "")
+					btnActive.Click(func() {
+						group.Active = !group.Active
 					})
+					btnRename.Click(func() {
+						top := history.GetTop()
+						if top == nil {
+							return
+						}
+						groups[top.Text] = group
+						delete(groups, name)
+					})
+					btnDelete.Click(func() {
+						delete(groups, name)
+					})
+				}
+
+				for i, item := range group.History.GetAll() {
+					menu := menu.AddSubMenuItem(formatMenuItem(item), item.Text)
+					switch global_show_menu_state {
+					case Click:
+						menu.Click(func() {
+							writer <- item
+						})
+					case RClick:
+						if config_single_delete {
+							copy := menu.AddSubMenuItem("复制", "")
+							del := menu.AddSubMenuItem("删除", "")
+							copy.Click(func() {
+								writer <- item
+							})
+							del.Click(func() {
+								history.Delete(i)
+							})
+						}else {
+							menu.Click(func() {
+								writer <- item
+							})
+						}
+					}
 				}
 			}
 
