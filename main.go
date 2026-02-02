@@ -289,12 +289,13 @@ func main() {
 					global_clear_state = ReadyToClear
 				})
 			} else {
-				menuOk := systray.AddMenuItem("确认清空历史记录？", "")
+				menu := systray.AddMenuItem("确认/取消清空历史记录？", "")
+				menuOk := menu.AddSubMenuItem("确认清空？", "")
 				menuOk.Click(func() {
 					global_clear_state = Normal
 					history.Clear()
 				})
-				menuCancle := systray.AddMenuItem("取消清空历史记录", "")
+				menuCancle := menu.AddSubMenuItem("取消清空?", "")
 				menuCancle.Click(func() {
 					global_clear_state = Normal
 				})
