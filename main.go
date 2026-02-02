@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"crypto/md5"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/energye/systray"
@@ -31,12 +29,13 @@ var (
 )
 
 var (
-	config_max           = 50
+	config_history_max = 50
 	config_single_delete = false
+	config_read_time_interval time.Duration = 200 // ms
 )
 
 func formatMenuItem(item *ClipItem) string {
-	text := item.Text
+	text := (string(item.Content))
 	var prefix string
 
 	switch item.Type {
@@ -46,10 +45,7 @@ func formatMenuItem(item *ClipItem) string {
 
 	case TypeImage:
 		prefix = "🖼️"
-
-	case TypeFile:
-		prefix = "📁"
-		text = truncateStringFromEnd(text, 50)
+		text = fmt.Sprintf("图片 [%s]", fmt.Sprintf("%x", md5.Sum(item.Content))[:8])
 	}
 
 	t := fmt.Sprintf("%s [%s] %s", prefix, item.Time.Format("15:04"), text)
@@ -63,6 +59,17 @@ func formatMenuItem(item *ClipItem) string {
 	return t
 }
 
+func formatMenuItemTooltip(item *ClipItem) string {
+	switch item.Type {
+	case TypeText:
+		return string(item.Content)
+	case TypeImage:
+		return "图片"
+	default:
+		return ""
+	}
+}
+
 // 从开头截断（保留前面部分）
 func truncateString(s string, maxLen int) string {
 	runes := []rune(s)
@@ -70,16 +77,6 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen]) + "..."
-}
-
-// 从末尾截断（保留后面部分，适合文件路径）
-func truncateStringFromEnd(s string, maxLen int) string {
-	runes := []rune(s)
-	if len(runes) <= maxLen {
-		return s
-	}
-	// 保留后面 maxLen-3 个字符
-	return "..." + string(runes[len(runes)-(maxLen-3):])
 }
 
 func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
@@ -99,73 +96,32 @@ func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
 	}()
 
 	go func() {
-		var lastText []byte
-		var lastImage []byte
-		var lastFilePath string
-
 		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			// 先检查是否有文件
-			filePath := getFilePath()
-			if filePath != "" {
-				if filePath != lastFilePath {
-					reader <- &ClipItem{
-						Type:     TypeFile,
-						Content:  []byte(filePath),
-						Text:     filePath,
-						FilePath: filePath,
-						Time:     time.Now(),
-					}
-					lastFilePath = filePath
-					lastText = nil
-				}
-				continue
-			} else {
-				// 没有文件时清空文件缓存
-				lastFilePath = ""
-			}
-
 			// 监听文本
 			text := clipboard.Read(clipboard.FmtText)
-			if len(text) > 0 && !bytes.Equal(text, lastText) {
-				textStr := string(text)
+			if len(text) > 0 {
 				itemType := TypeText
-				displayText := textStr
-				filePath := ""
-
-				// 检查是否是 file:// 格式（Linux）
-				if strings.HasPrefix(textStr, "file://") {
-					itemType = TypeFile
-					filePath = strings.TrimPrefix(textStr, "file://")
-					filePath = strings.TrimSpace(filePath)
-					displayText = filePath
-				}
 
 				reader <- &ClipItem{
 					Type:     itemType,
 					Content:  append([]byte(nil), text...),
-					Text:     displayText,
-					FilePath: filePath,
+					Hash:     fmt.Sprintf("%x", md5.Sum(text)),
 					Time:     time.Now(),
 				}
-
-				lastText = append([]byte(nil), text...)
 			}
 
 			// 监听图片
 			image := clipboard.Read(clipboard.FmtImage)
-			if len(image) > 0 && !bytes.Equal(image, lastImage) {
-				hash := fmt.Sprintf("%x", md5.Sum(image))
+			if len(image) > 0 {
 				reader <- &ClipItem{
 					Type:     TypeImage,
 					Content:  append([]byte(nil), image...),
-					Text:     fmt.Sprintf("图片 [%s]", hash[:8]), // 显示前8位MD5
-					FilePath: hash,                             // 完整 MD5 用于去重
+					Hash:     fmt.Sprintf("%x", md5.Sum(image)),
 					Time:     time.Now(),
 				}
-				lastImage = append([]byte(nil), image...)
 			}
 		}
 	}()
@@ -174,7 +130,7 @@ func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
 }
 
 func main() {
-	history := NewHistory(config_max)
+	history := NewHistory(config_history_max)
 	writer := make(chan *ClipItem)
 
 	groups := make(map[string]*Group)
@@ -190,7 +146,7 @@ func main() {
 
 			for _, group := range groups {
 				if group.Active {
-					group.History.Add(item)
+					group.History.Add(item.Clone())
 				}
 			}
 		}
@@ -214,7 +170,7 @@ func main() {
 		addHistoryMenuAction := func() {
 			all := history.GetAll()
 			for i, item := range all {
-				menu := systray.AddMenuItem(formatMenuItem(item), item.Text)
+				menu := systray.AddMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 				switch global_show_menu_state {
 				case Click:
 					menu.Click(func() {
@@ -249,7 +205,11 @@ func main() {
 				if top == nil {
 					return
 				}
-				groups[top.Text] = NewGroup(top.Text, true, config_max)
+				if top.Type == TypeText {
+					groups[string(top.Content)] = NewGroup(string(top.Content), false, config_history_max)
+				}else{
+					fmt.Println("不支持创建图片分组")
+				}
 			})
 			addSeparator()
 		}
@@ -270,8 +230,12 @@ func main() {
 						if top == nil {
 							return
 						}
-						groups[top.Text] = group
-						delete(groups, name)
+						if top.Type == TypeText {
+							groups[string(top.Content)] = group
+							delete(groups, name)
+						}else{
+							fmt.Println("不支持重命名图片分组")
+						}
 					})
 					btnDelete.Click(func() {
 						delete(groups, name)
@@ -279,7 +243,7 @@ func main() {
 				}
 
 				for i, item := range group.History.GetAll() {
-					menu := menu.AddSubMenuItem(formatMenuItem(item), item.Text)
+					menu := menu.AddSubMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 					switch global_show_menu_state {
 					case Click:
 						menu.Click(func() {

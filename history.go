@@ -10,15 +10,22 @@ type ItemType int
 const (
 	TypeText ItemType = iota
 	TypeImage
-	TypeFile
 )
 
 type ClipItem struct {
 	Type     ItemType
 	Content  []byte
-	Text     string
-	FilePath string
+	Hash     string
 	Time     time.Time
+}
+
+func (c *ClipItem) Clone() *ClipItem{
+	return &ClipItem{
+		Type:     c.Type,
+		Content:  append([]byte{}, c.Content...),
+		Hash:     c.Hash,
+		Time:     c.Time,
+	}
 }
 
 type History struct {
@@ -38,8 +45,11 @@ func (h *History) Add(item *ClipItem) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if item == nil || item.Text == "" {
-		return
+	if len(h.items) > 0{
+		top := h.items[0]
+		if top != nil && top.Type == item.Type && top.Hash == item.Hash {
+			return
+		}
 	}
 
 	// 允许重复，直接添加到最前面
