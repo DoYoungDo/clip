@@ -21,6 +21,14 @@ mkdir -p "$APP_DIR/Contents/Resources"
 # 移动可执行文件
 mv $BUILD_DIR/clip "$APP_DIR/Contents/MacOS/$APP_NAME"
 
+# 复制图标文件
+if [ -f "script/icon.icns" ]; then
+    echo "添加应用图标..."
+    cp script/icon.icns "$APP_DIR/Contents/Resources/icon.icns"
+else
+    echo "警告: 未找到 script/icon.icns 文件，跳过图标设置"
+fi
+
 # 创建 Info.plist
 cat > "$APP_DIR/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -39,6 +47,8 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <string>$VERSION</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>icon</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>

@@ -13,10 +13,10 @@ const (
 )
 
 type ClipItem struct {
-	Type     ItemType
-	Content  []byte
-	Hash     string
-	Time     time.Time
+	Type     ItemType `json:"type"`
+	Content  []byte `json:"content"`
+	Hash     string `json:"hash"`
+	Time     time.Time `json:"time"`
 }
 
 func (c *ClipItem) Clone() *ClipItem{

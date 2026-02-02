@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/energye/systray"
@@ -23,15 +25,16 @@ const (
 	RClick
 )
 
+// 全局状态
 var (
 	global_clear_state   = Normal
 	global_show_menu_state = Click
 )
 
+// 全局配置
 var (
 	config_history_max = 50
 	config_single_delete = false
-	config_read_time_interval time.Duration = 200 // ms
 )
 
 func formatMenuItem(item *ClipItem) string {
@@ -129,17 +132,45 @@ func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
 	return reader, writer, nil
 }
 
-func main() {
-	history := NewHistory(config_history_max)
-	writer := make(chan *ClipItem)
+func loadAndInitCache()*Config{
+	localConfig := NewDefaultConfig()
+	data, err := os.ReadFile(getConfigPath())
+	if err == nil{
+		json.Unmarshal(data, &localConfig)
+	}
 
+	config_history_max = localConfig.HistoryMax
+	config_single_delete = localConfig.SingleDelete
+
+	return localConfig
+}
+
+func main() {
+	localConfig := loadAndInitCache()
+
+	history := NewHistory(config_history_max)
 	groups := make(map[string]*Group)
 
+	// 加载本地历史记录
+	if localConfig.Data.History != nil{
+		history.items = localConfig.Data.History
+	}
+	if localConfig.Data.Groups != nil{
+		for name, groupData := range localConfig.Data.Groups{
+			groups[name] = NewGroup(name, groupData.Active, config_history_max)
+			if groupData.History != nil{
+				groups[name].History.items = groupData.History
+			}
+		}
+	}
+
+	// 启动监听
 	reader, writer, err := startMonitor()
 	if err != nil {
 		return
 	}
 
+	// 更新监听通道
 	go func() {
 		for item := range reader {
 			history.Add(item)
@@ -152,8 +183,10 @@ func main() {
 		}
 	}()
 
+	// 初始化系统托盘
 	systray.Run(func() {
-		systray.SetIcon(iconData)
+		// Windows 系统托盘图标设置
+		systray.SetIcon(logo)
 		systray.SetTooltip("Clip")
 
 		addSeparator := func() {
@@ -328,6 +361,23 @@ func main() {
 			menu.ShowMenu()
 		})
 	}, func() {
+		// 关闭监听通道
+		close(reader)
 		close(writer)
+
+		// 保存配置
+		config := NewDefaultConfig()
+		config.HistoryMax = config_history_max
+		config.SingleDelete = config_single_delete
+		config.Data.History = history.GetAll()
+		for name, group := range groups {
+			config.Data.Groups[name] = HistoryGroupData{
+				Active: group.Active,
+				History: group.History.GetAll(),
+			}
+		}
+
+		data, _ := json.Marshal(config)
+    	os.WriteFile(getConfigPath(), data, 0644)
 	})
 }

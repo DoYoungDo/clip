@@ -1,31 +1,43 @@
 #!/bin/bash
 
-# 编译脚本 - 支持多平台编译
+# 构建脚本快捷入口
 
-APP_NAME="clip"
-VERSION="1.0.0"
-BUILD_DIR="build"
-
-# 创建构建目录
-mkdir -p $BUILD_DIR
-
-echo "开始编译 $APP_NAME v$VERSION..."
-
-# 当前平台编译（macOS ARM64）
-echo "编译 macOS ARM64..."
-GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $BUILD_DIR/${APP_NAME}-darwin-arm64 .
-
-# Linux
-echo "编译 Linux AMD64..."
-GOOS=linux GOARCH=amd64 go build -o $BUILD_DIR/${APP_NAME}-linux-amd64 .
-
-echo "编译 Linux ARM64..."
-GOOS=linux GOARCH=arm64 go build -o $BUILD_DIR/${APP_NAME}-linux-arm64 .
-
-# Windows
-echo "编译 Windows AMD64..."
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o $BUILD_DIR/${APP_NAME}-windows-amd64.exe .
-
-echo ""
-echo "编译完成！输出目录: $BUILD_DIR/"
-ls -lh $BUILD_DIR/
+case "$1" in
+    "app")
+        script/build-app.sh
+        ;;
+    "all")
+        script/build.sh
+        ;;
+    "mac-arm64")
+        script/build-mac-arm64.sh
+        ;;
+    "mac-amd64")
+        script/build-mac-amd64.sh
+        ;;
+    "linux-amd64")
+        script/build-linux-amd64.sh
+        ;;
+    "linux-arm64")
+        script/build-linux-arm64.sh
+        ;;
+    "win-amd64")
+        script/build-win-amd64.sh
+        ;;
+    "win-arm64")
+        script/build-win-arm64.sh
+        ;;
+    *)
+        echo "用法: $0 [app|all|mac-arm64|mac-amd64|linux-amd64|linux-arm64|win-amd64|win-arm64]"
+        echo ""
+        echo "选项:"
+        echo "  app         - 构建 macOS .app 应用包"
+        echo "  all         - 构建所有平台"
+        echo "  mac-arm64   - 构建 macOS ARM64"
+        echo "  mac-amd64   - 构建 macOS AMD64"
+        echo "  linux-amd64 - 构建 Linux AMD64"
+        echo "  linux-arm64 - 构建 Linux ARM64"
+        echo "  win-amd64   - 构建 Windows AMD64"
+        echo "  win-arm64   - 构建 Windows ARM64"
+        ;;
+esac
