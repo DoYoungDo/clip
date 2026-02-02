@@ -18,10 +18,18 @@ const (
 	ReadyToClear
 )
 
+type ShowMenuState int
+
+const (
+	Click ShowMenuState = iota
+	RClick
+)
+
 var (
 	config_max           = 50
-	global_clear_state   = Normal
 	config_single_delete = false
+	global_clear_state   = Normal
+	global_show_menu_state = Click
 )
 
 // func formatMenuItem(item *ClipItem) string {
@@ -225,18 +233,33 @@ func main() {
 		}
 
 		addHistoryMenuAction := func() {
-			for i, item := range history.GetAll() {
+			all := history.GetAll()
+			for i, item := range all {
 				menu := systray.AddMenuItem(formatMenuItem(item), item.Text)
-				menu.Click(func() {
-					writer <- item
-				})
-
-				if config_single_delete {
-					del := menu.AddSubMenuItem("删除", "")
-					del.Click(func() {
-						history.Delete(i)
+				switch global_show_menu_state {
+				case Click:
+					menu.Click(func() {
+						writer <- item
 					})
+				case RClick:
+					if config_single_delete {
+						copy := menu.AddSubMenuItem("复制", "")
+						del := menu.AddSubMenuItem("删除", "")
+						copy.Click(func() {
+							writer <- item
+						})
+						del.Click(func() {
+							history.Delete(i)
+						})
+					}else {
+						menu.Click(func() {
+							writer <- item
+						})
+					}
 				}
+			}
+			if len(all) > 0{
+				addSeparator()
 			}
 		}
 
@@ -249,6 +272,7 @@ func main() {
 				}
 				groups[top.Text] = NewGroup(top.Text, true, config_max)
 			})
+			addSeparator()
 		}
 
 		addGroupMenuAction := func() {
@@ -280,6 +304,10 @@ func main() {
 					})
 				}
 			}
+
+			if len(groups) > 0{
+				addSeparator()
+			}
 		}
 
 		addCleanHistoryMenuCmd := func() {
@@ -300,6 +328,7 @@ func main() {
 					global_clear_state = Normal
 				})
 			}
+			addSeparator()
 		}
 
 		addConfigMenuAction := func() {
@@ -308,27 +337,34 @@ func main() {
 			btnSingleDelete.Click(func() {
 				config_single_delete = !config_single_delete
 			})
+			addSeparator()
 		}
 
-		readyAndShow := func(menu systray.IMenu) {
+		systray.SetOnClick(func(menu systray.IMenu) {
+			global_show_menu_state = Click
+
 			systray.ResetMenu()
 
 			addHistoryMenuAction()
-			addSeparator()
-			addCleanHistoryMenuCmd()
-			addSeparator()
 			addGroupMenuAction()
-			addSeparator()
-			addCreateGroupMenuCmd()
-			addSeparator()
-			addConfigMenuAction()
-			addSeparator()
 			addQuitMenuCmd()
 
 			menu.ShowMenu()
-		}
-		systray.SetOnClick(readyAndShow)
-		systray.SetOnRClick(readyAndShow)
+		})
+		systray.SetOnRClick(func(menu systray.IMenu) {
+			global_show_menu_state = RClick
+
+			systray.ResetMenu()
+
+			addHistoryMenuAction()
+			addCleanHistoryMenuCmd()
+			addGroupMenuAction()
+			addCreateGroupMenuCmd()
+			addConfigMenuAction()
+			addQuitMenuCmd()
+
+			menu.ShowMenu()
+		})
 	}, func() {
 		close(writer)
 	})
