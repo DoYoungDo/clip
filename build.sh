@@ -15,10 +15,6 @@ echo "开始编译 $APP_NAME v$VERSION..."
 echo "编译 macOS ARM64..."
 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $BUILD_DIR/${APP_NAME}-darwin-arm64 .
 
-# macOS Intel
-echo "编译 macOS Intel..."
-GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o $BUILD_DIR/${APP_NAME}-darwin-amd64 .
-
 # Linux
 echo "编译 Linux AMD64..."
 GOOS=linux GOARCH=amd64 go build -o $BUILD_DIR/${APP_NAME}-linux-amd64 .
