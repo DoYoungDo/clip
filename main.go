@@ -150,6 +150,7 @@ func main() {
 
 	history := NewHistory(config_history_max)
 	groups := make(map[string]*Group)
+	groupNames := localConfig.Data.GroupNames
 
 	// 加载本地历史记录
 	if localConfig.Data.History != nil{
@@ -239,7 +240,9 @@ func main() {
 					return
 				}
 				if top.Type == TypeText {
-					groups[string(top.Content)] = NewGroup(string(top.Content), false, config_history_max)
+					text := string(top.Content)
+					groups[text] = NewGroup(text, false, config_history_max)
+					groupNames = append(groupNames, text)
 				}else{
 					fmt.Println("不支持创建图片分组")
 				}
@@ -248,7 +251,8 @@ func main() {
 		}
 
 		addGroupMenuAction := func() {
-			for name, group := range groups {
+			for _, name := range groupNames {
+				group := groups[name]
 				menu := systray.AddMenuItemCheckbox("📂" + name, "", group.Active)
 
 				if global_show_menu_state == RClick{
@@ -376,6 +380,7 @@ func main() {
 				History: group.History.GetAll(),
 			}
 		}
+		config.Data.GroupNames = groupNames
 
 		data, _ := json.Marshal(config)
     	os.WriteFile(getConfigPath(), data, 0644)

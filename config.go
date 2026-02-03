@@ -8,6 +8,7 @@ type HistoryGroupData struct{
 type HistoryData struct{
 	History []*ClipItem `json:"history"`
 	Groups map[string]HistoryGroupData `json:"groups"`
+	GroupNames []string `json:"group_names"`
 }
 
 type Config struct{
@@ -23,6 +24,7 @@ func NewDefaultConfig() *Config{
 		Data: HistoryData{
 			History: nil,
 			Groups: make(map[string]HistoryGroupData),
+			GroupNames: []string{},
 		},
 	}
 }
