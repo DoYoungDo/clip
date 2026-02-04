@@ -12,7 +12,7 @@ type HistoryData struct{
 }
 
 type Config struct{
-	HistoryMax int `json:"history_max"`
+	HistoryMax uint `json:"history_max"`
 	SingleDelete bool `json:"single_delete"`
 	AutoRecognizeColor bool `json:"auto_recognize_color"`
 	Data HistoryData `json:"data"`

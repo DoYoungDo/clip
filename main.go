@@ -32,12 +32,17 @@ var (
 	global_show_menu_state = Click
 )
 
+const (
+	const_max_history uint = 300
+)
+
 // 全局配置
 var (
-	config_history_max = 50
+	config_history_max uint = const_max_history
 	config_single_delete = false
 	config_auto_recognize_color = false
 )
+
 
 func formatMenuItem(item *ClipItem) string {
 	text := (string(item.Content))
@@ -150,13 +155,15 @@ func main() {
 		config_single_delete = localConfig.SingleDelete
 		config_auto_recognize_color = localConfig.AutoRecognizeColor
 
+		history.SetMaxSize(config_history_max)
+
 		// 加载本地历史记录
 		if localConfig.Data.History != nil{
 			history.items = localConfig.Data.History
 		}
 		if localConfig.Data.Groups != nil{
 			for name, groupData := range localConfig.Data.Groups{
-				groups[name] = NewGroup(name, groupData.Active, config_history_max)
+				groups[name] = NewGroup(name, groupData.Active, const_max_history)
 				if groupData.History != nil{
 					groups[name].History.items = groupData.History
 				}
@@ -308,7 +315,7 @@ func main() {
 				}
 				if top.Type == TypeText {
 					text := string(top.Content)
-					groups[text] = NewGroup(text, false, config_history_max)
+					groups[text] = NewGroup(text, false, const_max_history)
 					groupNames = append(groupNames, text)
 				}else{
 					fmt.Println("不支持创建图片分组")
@@ -414,11 +421,31 @@ func main() {
 			menu := systray.AddMenuItem("配置", "")
 			btnSingleDelete := menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete)
 			btnAutoRecognizeColor := menu.AddSubMenuItemCheckbox("自动识别颜色", "", config_auto_recognize_color)
+			btnSetMaxHistory := menu.AddSubMenuItem("设置最大历史记录条数" + fmt.Sprintf("(当前: %d)", config_history_max), "")
 			btnSingleDelete.Click(func() {
 				config_single_delete = !config_single_delete
 			})
 			btnAutoRecognizeColor.Click(func() {
 				config_auto_recognize_color = !config_auto_recognize_color
+			})
+			btnSetMaxHistory.Click(func() {
+				top := history.GetTop()
+				if top == nil || top.Type != TypeText {
+					return
+				}
+
+				text := string(top.Content)
+				digit, err := strconv.ParseUint(text, 10, 0)
+				if err != nil {
+					return
+				}
+
+				if digit > 300{
+					return
+				}
+
+				config_history_max = uint(digit)
+				history.SetMaxSize(config_history_max)
 			})
 			addSeparator()
 		}

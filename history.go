@@ -30,11 +30,11 @@ func (c *ClipItem) Clone() *ClipItem{
 
 type History struct {
 	items   []*ClipItem
-	maxSize int
+	maxSize uint
 	mu      sync.RWMutex
 }
 
-func NewHistory(maxSize int) *History {
+func NewHistory(maxSize uint) *History {
 	return &History{
 		items:   []*ClipItem{},
 		maxSize: maxSize,
@@ -54,7 +54,7 @@ func (h *History) Add(item *ClipItem) {
 
 	// 允许重复，直接添加到最前面
 	h.items = append([]*ClipItem{item}, h.items...)
-	if len(h.items) > h.maxSize {
+	if (uint)(len(h.items)) > h.maxSize {
 		h.items = h.items[:h.maxSize]
 	}
 }
@@ -95,6 +95,17 @@ func (h *History) Delete(index int) {
 	h.items = append(h.items[:index], h.items[index+1:]...)
 }
 
+func (h *History) SetMaxSize(max uint) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.maxSize = max
+
+	if max < (uint)(len(h.items)) {
+		h.items = h.items[:max]
+	}
+}
+
 type Group struct {
 	Name         string
 	Active       bool
@@ -102,7 +113,7 @@ type Group struct {
 	SingleDelete bool
 }
 
-func NewGroup(name string, active bool, maxSize int) *Group {
+func NewGroup(name string, active bool, maxSize uint) *Group {
 	return &Group{
 		Name:         name,
 		Active:       active,
