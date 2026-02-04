@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/energye/systray"
@@ -30,6 +31,8 @@ const (
 var (
 	global_clear_state   = Normal
 	global_show_menu_state = Click
+	global_search_enable = false
+	global_search_text string = ""
 )
 
 const (
@@ -264,9 +267,14 @@ func main() {
 			})
 		}
 
-		addHistoryMenuAction := func() {
+		addHistoryMenuAction := func() bool {
 			all := history.GetAll()
 			for i, item := range all {
+				if global_search_enable {
+					if !strings.Contains(string(item.Content), global_search_text){
+						continue
+					}
+				}
 				menu := systray.AddMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 				switch global_show_menu_state {
 				case Click:
@@ -301,9 +309,8 @@ func main() {
 					}
 				}
 			}
-			if len(all) > 0{
-				addSeparator()
-			}
+
+			return len(all) > 0
 		}
 
 		addCreateGroupMenuCmd := func() {
@@ -321,10 +328,9 @@ func main() {
 					fmt.Println("不支持创建图片分组")
 				}
 			})
-			addSeparator()
 		}
 
-		addGroupMenuAction := func() {
+		addGroupMenuAction := func() bool {
 			for i, name := range groupNames {
 				group := groups[name]
 				menu := systray.AddMenuItemCheckbox("📂" + name, "", group.Active)
@@ -355,6 +361,11 @@ func main() {
 				}
 
 				for i, item := range group.History.GetAll() {
+					if global_search_enable {
+						if !strings.Contains(string(item.Content), global_search_text){
+							continue
+						}
+					}
 					menu := menu.AddSubMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 					switch global_show_menu_state {
 					case Click:
@@ -391,9 +402,7 @@ func main() {
 				}
 			}
 
-			if global_show_menu_state == RClick && len(groups) > 0{
-				addSeparator()
-			}
+			return len(groups) > 0
 		}
 
 		addCleanHistoryMenuCmd := func() {
@@ -414,7 +423,6 @@ func main() {
 					global_clear_state = Normal
 				})
 			}
-			addSeparator()
 		}
 
 		addConfigMenuAction := func() {
@@ -447,7 +455,27 @@ func main() {
 				config_history_max = uint(digit)
 				history.SetMaxSize(config_history_max)
 			})
-			addSeparator()
+		}
+
+		addSearchMenuAction := func ()  {
+			systray.AddMenuItemCheckbox("🔎 搜索" + Ifel(global_search_enable, ":" + global_search_text, ""), "", global_search_enable).Click(func() {
+				global_search_enable = !global_search_enable
+				if !global_search_enable{
+					global_search_text = ""
+					return
+				}
+
+				top := history.GetTop()
+				if top == nil{
+					return
+				}
+				text := string(top.Content)
+				if text == ""{
+					return
+				}
+
+				global_search_text = text
+			})
 		}
 
 		systray.SetOnClick(func(menu systray.IMenu) {
@@ -455,7 +483,9 @@ func main() {
 
 			systray.ResetMenu()
 
-			addHistoryMenuAction()
+			if addHistoryMenuAction() {
+				addSeparator()
+			}
 			addGroupMenuAction()
 
 			menu.ShowMenu()
@@ -465,11 +495,20 @@ func main() {
 
 			systray.ResetMenu()
 
-			addHistoryMenuAction()
+			if addHistoryMenuAction() {
+				addSeparator()
+			}
 			addCleanHistoryMenuCmd()
-			addGroupMenuAction()
+			addSeparator()
+			if (addGroupMenuAction()) {
+				addSeparator()
+			}
 			addCreateGroupMenuCmd()
+			addSeparator()
+			addSearchMenuAction()
+			addSeparator()
 			addConfigMenuAction()
+			addSeparator()
 			addQuitMenuCmd()
 
 			menu.ShowMenu()
