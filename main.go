@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/energye/systray"
@@ -35,6 +36,7 @@ var (
 var (
 	config_history_max = 50
 	config_single_delete = false
+	config_auto_recognize_color = false
 )
 
 func formatMenuItem(item *ClipItem) string {
@@ -132,39 +134,57 @@ func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
 	return reader, writer, nil
 }
 
-func loadAndInitCache()*Config{
-	localConfig := NewDefaultConfig()
-	data, err := os.ReadFile(getConfigPath())
-	if err == nil{
-		json.Unmarshal(data, &localConfig)
-	}
-
-	config_history_max = localConfig.HistoryMax
-	config_single_delete = localConfig.SingleDelete
-
-	return localConfig
-}
-
 func main() {
-	localConfig := loadAndInitCache()
-
 	history := NewHistory(config_history_max)
 	groups := make(map[string]*Group)
-	groupNames := localConfig.Data.GroupNames
+	groupNames := []string{}
 
-	// 加载本地历史记录
-	if localConfig.Data.History != nil{
-		history.items = localConfig.Data.History
-	}
-	if localConfig.Data.Groups != nil{
-		for name, groupData := range localConfig.Data.Groups{
-			groups[name] = NewGroup(name, groupData.Active, config_history_max)
-			if groupData.History != nil{
-				groups[name].History.items = groupData.History
+	cacheToLocal := func() func()  {
+		localConfig := NewDefaultConfig()
+		data, err := os.ReadFile(getConfigPath())
+		if err == nil{
+			json.Unmarshal(data, &localConfig)
+		}
+
+		config_history_max = localConfig.HistoryMax
+		config_single_delete = localConfig.SingleDelete
+		config_auto_recognize_color = localConfig.AutoRecognizeColor
+
+		// 加载本地历史记录
+		if localConfig.Data.History != nil{
+			history.items = localConfig.Data.History
+		}
+		if localConfig.Data.Groups != nil{
+			for name, groupData := range localConfig.Data.Groups{
+				groups[name] = NewGroup(name, groupData.Active, config_history_max)
+				if groupData.History != nil{
+					groups[name].History.items = groupData.History
+				}
 			}
 		}
-	}
 
+		groupNames = localConfig.Data.GroupNames
+
+		return func() {
+			// 保存配置
+			config := NewDefaultConfig()
+			config.HistoryMax = config_history_max
+			config.SingleDelete = config_single_delete
+			config.AutoRecognizeColor = config_auto_recognize_color
+			config.Data.History = history.GetAll()
+			for name, group := range groups {
+				config.Data.Groups[name] = HistoryGroupData{
+					Active: group.Active,
+					History: group.History.GetAll(),
+				}
+			}
+			config.Data.GroupNames = groupNames
+
+			data, _ := json.Marshal(config)
+			os.WriteFile(getConfigPath(), data, 0644)
+		}
+	}()
+	
 	// 启动监听
 	reader, writer, err := startMonitor()
 	if err != nil {
@@ -190,6 +210,42 @@ func main() {
 		systray.SetIcon(logo)
 		systray.SetTooltip("Clip")
 
+		addColorRecognizeMenuAction := func (menu *systray.MenuItem, item *ClipItem) bool  {
+			if !config_auto_recognize_color || item.Type != TypeText{
+				return false
+			}
+
+			r,g,b,base,ok := getColor(string(item.Content))
+			if ok {
+				rt,_ := strconv.ParseInt(r,base,0)
+				gt,_ := strconv.ParseInt(g,base,0)
+				bt,_ := strconv.ParseInt(b,base,0)
+				hexT := fmt.Sprintf("#%x%x%x", rt, gt, bt)
+				rgbT := fmt.Sprintf("%d,%d,%d", rt, gt, bt)
+
+				copyH := menu.AddSubMenuItem("复制Hex", "")
+				copyRGB := menu.AddSubMenuItem("复制RGB", "")
+				copyH.Click(func() {
+					writer <- &ClipItem{
+						Type:     TypeText,
+						Content:  append([]byte(nil), hexT...),
+						Hash:     fmt.Sprintf("%x", md5.Sum([]byte(hexT))),
+						Time:     time.Now(),
+					}
+				})
+				copyRGB.Click(func() {
+					writer <- &ClipItem{
+						Type:     TypeText,
+						Content:  append([]byte(nil), rgbT...),
+						Hash:     fmt.Sprintf("%x", md5.Sum([]byte(rgbT))),
+						Time:     time.Now(),
+					}
+				})
+				return true
+			}	
+			return false
+		}
+
 		addSeparator := func() {
 			systray.AddSeparator()
 		}
@@ -207,23 +263,34 @@ func main() {
 				menu := systray.AddMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 				switch global_show_menu_state {
 				case Click:
-					menu.Click(func() {
-						writer <- item
-					})
-				case RClick:
-					if config_single_delete {
-						copy := menu.AddSubMenuItem("复制", "")
-						del := menu.AddSubMenuItem("删除", "")
-						copy.Click(func() {
-							writer <- item
-						})
-						del.Click(func() {
-							history.Delete(i)
-						})
-					}else {
+					if !addColorRecognizeMenuAction(menu, item){
 						menu.Click(func() {
 							writer <- item
 						})
+					} 
+				case RClick:
+					if addColorRecognizeMenuAction(menu, item){
+						if config_single_delete {
+							del := menu.AddSubMenuItem("删除", "")
+							del.Click(func() {
+								history.Delete(i)
+							})
+						}
+					}else{
+						if config_single_delete {
+							copy := menu.AddSubMenuItem("复制", "")
+							del := menu.AddSubMenuItem("删除", "")
+							copy.Click(func() {
+								writer <- item
+							})
+							del.Click(func() {
+								history.Delete(i)
+							})
+						}else {
+							menu.Click(func() {
+								writer <- item
+							})
+						}	
 					}
 				}
 			}
@@ -251,7 +318,7 @@ func main() {
 		}
 
 		addGroupMenuAction := func() {
-			for _, name := range groupNames {
+			for i, name := range groupNames {
 				group := groups[name]
 				menu := systray.AddMenuItemCheckbox("📂" + name, "", group.Active)
 
@@ -276,6 +343,7 @@ func main() {
 					})
 					btnDelete.Click(func() {
 						delete(groups, name)
+						groupNames = append(groupNames[:i], groupNames[i+1:]...)
 					})
 				}
 
@@ -283,23 +351,34 @@ func main() {
 					menu := menu.AddSubMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 					switch global_show_menu_state {
 					case Click:
-						menu.Click(func() {
-							writer <- item
-						})
-					case RClick:
-						if config_single_delete {
-							copy := menu.AddSubMenuItem("复制", "")
-							del := menu.AddSubMenuItem("删除", "")
-							copy.Click(func() {
-								writer <- item
-							})
-							del.Click(func() {
-								group.History.Delete(i)
-							})
-						}else {
+						if !addColorRecognizeMenuAction(menu, item){
 							menu.Click(func() {
 								writer <- item
 							})
+						} 
+					case RClick:
+						if addColorRecognizeMenuAction(menu, item){
+							if config_single_delete {
+								del := menu.AddSubMenuItem("删除", "")
+								del.Click(func() {
+									history.Delete(i)
+								})
+							}
+						}else{
+							if config_single_delete {
+								copy := menu.AddSubMenuItem("复制", "")
+								del := menu.AddSubMenuItem("删除", "")
+								copy.Click(func() {
+									writer <- item
+								})
+								del.Click(func() {
+									group.History.Delete(i)
+								})
+							}else {
+								menu.Click(func() {
+									writer <- item
+								})
+							}	
 						}
 					}
 				}
@@ -334,8 +413,12 @@ func main() {
 		addConfigMenuAction := func() {
 			menu := systray.AddMenuItem("配置", "")
 			btnSingleDelete := menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete)
+			btnAutoRecognizeColor := menu.AddSubMenuItemCheckbox("自动识别颜色", "", config_auto_recognize_color)
 			btnSingleDelete.Click(func() {
 				config_single_delete = !config_single_delete
+			})
+			btnAutoRecognizeColor.Click(func() {
+				config_auto_recognize_color = !config_auto_recognize_color
 			})
 			addSeparator()
 		}
@@ -369,20 +452,6 @@ func main() {
 		close(reader)
 		close(writer)
 
-		// 保存配置
-		config := NewDefaultConfig()
-		config.HistoryMax = config_history_max
-		config.SingleDelete = config_single_delete
-		config.Data.History = history.GetAll()
-		for name, group := range groups {
-			config.Data.Groups[name] = HistoryGroupData{
-				Active: group.Active,
-				History: group.History.GetAll(),
-			}
-		}
-		config.Data.GroupNames = groupNames
-
-		data, _ := json.Marshal(config)
-    	os.WriteFile(getConfigPath(), data, 0644)
+		cacheToLocal()
 	})
 }
