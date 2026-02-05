@@ -407,7 +407,7 @@ func main() {
 
 		addCleanHistoryMenuCmd := func() {
 			if global_clear_state == Normal {
-				menu := systray.AddMenuItem("清空历史记录", "")
+				menu := systray.AddMenuItem("清空历史记录", "【清空历史记录】会将历史记录清空，但是不会清空剪贴板中的内容")
 				menu.Click(func() {
 					global_clear_state = ReadyToClear
 				})
@@ -429,7 +429,7 @@ func main() {
 			menu := systray.AddMenuItem("配置", "")
 			btnSingleDelete := menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete)
 			btnAutoRecognizeColor := menu.AddSubMenuItemCheckbox("自动识别颜色", "", config_auto_recognize_color)
-			btnSetMaxHistory := menu.AddSubMenuItem("设置最大历史记录条数" + fmt.Sprintf("(当前: %d)", config_history_max), "")
+			btnSetMaxHistory := menu.AddSubMenuItem("设置最大历史记录条数" + fmt.Sprintf("(当前: %d)", config_history_max), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300")
 			btnSingleDelete.Click(func() {
 				config_single_delete = !config_single_delete
 			})
@@ -458,7 +458,7 @@ func main() {
 		}
 
 		addSearchMenuAction := func ()  {
-			systray.AddMenuItemCheckbox("🔎 搜索" + Ifel(global_search_enable, ":" + global_search_text, ""), "", global_search_enable).Click(func() {
+			systray.AddMenuItemCheckbox("🔎 搜索" + Ifel(global_search_enable, ":" + global_search_text, ""), "【搜索】会使用剪贴板内的内容进行过滤，再次点击取消搜索", global_search_enable).Click(func() {
 				global_search_enable = !global_search_enable
 				if !global_search_enable{
 					global_search_text = ""
