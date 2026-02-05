@@ -9,9 +9,22 @@ APP_DIR="$BUILD_DIR/$APP_NAME.app"
 
 echo "开始打包 macOS 应用..."
 
+rm -rf $APP_DIR
+
 # 编译
 echo "编译..."
-go build -ldflags="-s -w" -o $BUILD_DIR/clip .
+
+SCRIPT_DIR="$(dirname "$0")"
+DIST_NAME="clip-darwin-arm64"
+
+case "$1" in
+    "amd")
+        $SCRIPT_DIR/build-mac-amd64.sh
+        DIST_NAME="clip-darwin-amd64"
+        ;;
+    *)
+        $SCRIPT_DIR/build-mac-arm64.sh
+esac
 
 # 创建 .app 目录结构
 echo "创建 .app 结构..."
@@ -19,7 +32,7 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 # 移动可执行文件
-mv $BUILD_DIR/clip "$APP_DIR/Contents/MacOS/$APP_NAME"
+mv $BUILD_DIR/$DIST_NAME "$APP_DIR/Contents/MacOS/$APP_NAME"
 
 # 复制图标文件
 if [ -f "script/icon.icns" ]; then

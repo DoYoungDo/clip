@@ -4,7 +4,7 @@
 
 case "$1" in
     "app")
-        script/build-app.sh
+        script/build-app.sh $2
         ;;
     "all")
         script/build.sh
