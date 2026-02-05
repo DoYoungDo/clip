@@ -448,7 +448,7 @@ func main() {
 					return
 				}
 
-				if digit > 300{
+				if digit > 300 || digit <= 0 {
 					return
 				}
 
