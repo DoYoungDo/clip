@@ -96,4 +96,56 @@ func (s *ShareServer) Share(item *ClipItem) {
 
 
 type ShareClient struct{
+	addr string
+	conn net.Conn
+	onShare func(item *ClipItem)
+	onClose func()
+}
+
+func NewShareClient(addr string) *ShareClient{
+	return &ShareClient{
+		addr: addr,
+		conn: nil,
+	}
+}
+
+func (c *ShareClient) ConnectTo() bool{
+	conn, err := net.Dial("tcp", c.addr)
+	if err != nil {
+		return false
+	}
+	c.conn = conn
+	go func(conn net.Conn) {
+		defer conn.Close()
+
+		scanner := bufio.NewScanner(conn)
+		for scanner.Scan() {
+			var item ClipItem
+			if err := json.Unmarshal(scanner.Bytes(), &item); err == nil {
+				if c.onShare != nil{
+					c.onShare(item.CloneToRemote())
+				}
+			}
+		}
+
+		if c.onClose != nil{
+			c.onClose()
+		}
+	}(c.conn)
+	return true;
+}
+
+func (c *ShareClient) OnShared(callback func(item *ClipItem)){
+	c.onShare = callback
+}
+
+func (c *ShareClient) OnClose(callback func()){
+	c.onClose = callback
+}
+
+func (c *ShareClient) Close() {
+	if c.conn != nil{
+		c.conn.Close()
+	}
+	c.conn = nil
 }

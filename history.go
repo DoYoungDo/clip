@@ -49,6 +49,15 @@ func NewClipItemFromRemote(itemType ItemType, content []byte) *ClipItem{
 	}
 }
 
+func (c *ClipItem) CloneToRemote() *ClipItem{
+	return &ClipItem{
+		Type:     c.Type,
+		Content:  append([]byte{}, c.Content...),
+		Hash:     c.Hash,
+		Time:     c.Time,
+		From:     FromRemote,
+	}
+}
 
 func (c *ClipItem) Clone() *ClipItem{
 	return &ClipItem{
@@ -73,14 +82,14 @@ func NewHistory(maxSize uint) *History {
 	}
 }
 
-func (h *History) Add(item *ClipItem) {
+func (h *History) Add(item *ClipItem) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if len(h.items) > 0{
 		top := h.items[0]
 		if top != nil && top.Type == item.Type && top.Hash == item.Hash {
-			return
+			return false
 		}
 	}
 
@@ -89,6 +98,7 @@ func (h *History) Add(item *ClipItem) {
 	if (uint)(len(h.items)) > h.maxSize {
 		h.items = h.items[:h.maxSize]
 	}
+	return true
 }
 
 func (h *History) GetAll() []*ClipItem {

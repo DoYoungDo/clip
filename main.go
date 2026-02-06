@@ -34,6 +34,7 @@ var (
 	global_search_enable = false
 	global_search_text string = ""
 	global_history_share_server *ShareServer = nil
+	global_history_share_clients map[string]*ShareClient = make(map[string]*ShareClient)
 )
 
 // 全局常量
@@ -63,7 +64,7 @@ func formatMenuItem(item *ClipItem) string {
 		text = fmt.Sprintf("图片 [%s]", fmt.Sprintf("%x", md5.Sum(item.Content))[:8])
 	}
 
-	t := fmt.Sprintf("%s [%s] %s", prefix, item.Time.Format("15:04"), text)
+	t := fmt.Sprintf("%s [%s]%s%s", prefix, item.Time.Format("15:04"), Ifel(item.From == FromRemote, " [R] ", ""), text)
 
 	// 安全检查：确保返回值不为空
 	if t == "" {
@@ -194,7 +195,7 @@ func main() {
 	// 更新监听通道
 	go func() {
 		for item := range reader {
-			history.Add(item)
+			succ := history.Add(item)
 
 			for _, group := range groups {
 				if group.Active {
@@ -202,8 +203,8 @@ func main() {
 				}
 			}
 
-			if global_history_share_server != nil{
-				global_history_share_server.Share(item.Clone())
+			if succ && global_history_share_server != nil{
+				global_history_share_server.Share(item.CloneToRemote())
 			}
 		}
 	}()
@@ -451,6 +452,40 @@ func main() {
 					global_history_share_server = nil
 				}
 			})
+			shareMenu.AddSubMenuItem("连接到", "").Click(func() {
+				top := history.GetTop()
+				if top == nil || top.Type != TypeText {
+					return
+				}
+
+				addr := string(top.Content)
+				if addr == ""{
+					return
+				}
+
+				if _, ok := global_history_share_clients[addr]; ok{
+					return
+				}
+
+				shareClient := NewShareClient(addr)
+				if shareClient.ConnectTo(){
+					global_history_share_clients[addr] = shareClient
+					shareClient.OnShared(func(item *ClipItem) {
+						history.Add(item)
+						writer <- item
+					})
+					shareClient.OnClose(func ()  {
+						delete(global_history_share_clients, addr)
+					})
+				}
+			})
+
+			for addr, client := range global_history_share_clients{
+				shareMenu.AddSubMenuItemCheckbox(addr, "", true).Click(func() {
+					client.Close()
+					delete(global_history_share_clients, addr)
+				})
+			}
 		}
 
 		addSearchMenuAction := func ()  {
