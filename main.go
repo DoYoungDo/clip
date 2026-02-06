@@ -33,8 +33,10 @@ var (
 	global_show_menu_state = Click
 	global_search_enable = false
 	global_search_text string = ""
+	global_history_share_server *ShareServer = nil
 )
 
+// 全局常量
 const (
 	const_max_history uint = 300
 )
@@ -198,6 +200,10 @@ func main() {
 				if group.Active {
 					group.History.Add(item.Clone())
 				}
+			}
+
+			if global_history_share_server != nil{
+				global_history_share_server.Share(item.Clone())
 			}
 		}
 	}()
@@ -405,16 +411,13 @@ func main() {
 
 		addConfigMenuAction := func() {
 			menu := systray.AddMenuItem("配置", "")
-			btnSingleDelete := menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete)
-			btnAutoRecognizeColor := menu.AddSubMenuItemCheckbox("自动识别颜色", "", config_auto_recognize_color)
-			btnSetMaxHistory := menu.AddSubMenuItem("设置最大历史记录条数" + fmt.Sprintf("(当前: %d)", config_history_max), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300")
-			btnSingleDelete.Click(func() {
+			menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete).Click(func() {
 				config_single_delete = !config_single_delete
 			})
-			btnAutoRecognizeColor.Click(func() {
+			menu.AddSubMenuItemCheckbox("自动识别颜色", "", config_auto_recognize_color).Click(func() {
 				config_auto_recognize_color = !config_auto_recognize_color
 			})
-			btnSetMaxHistory.Click(func() {
+			menu.AddSubMenuItem("设置最大历史记录条数" + fmt.Sprintf("(当前: %d)", config_history_max), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
 				top := history.GetTop()
 				if top == nil || top.Type != TypeText {
 					return
@@ -432,6 +435,21 @@ func main() {
 
 				config_history_max = uint(digit)
 				history.SetMaxSize(config_history_max)
+			})
+			shareMenu := menu.AddSubMenuItem("局域网共享","")
+			shareMenu.AddSubMenuItemCheckbox("局域网共享" + IfelFunc(global_history_share_server != nil, func() string { return fmt.Sprintf("(%v)", global_history_share_server.AddrString()) }, func() string { return "" }), "", global_history_share_server != nil).Click(func() {
+				if global_history_share_server == nil {
+					// 创建tcp server
+					global_history_share_server = NewShareServer()
+					// 将tcp server地址写入剪贴板
+					writer <- NewClipItem(TypeText, []byte(global_history_share_server.AddrString()))
+					// 启动tcp server 监听
+					global_history_share_server.Start()
+				}else{
+					// 关闭tcp server 监听
+					global_history_share_server.Stop()
+					global_history_share_server = nil
+				}
 			})
 		}
 
@@ -492,6 +510,10 @@ func main() {
 			menu.ShowMenu()
 		})
 	}, func() {
+		if global_history_share_server != nil {
+			global_history_share_server.Stop()
+		}
+
 		// 关闭监听通道
 		close(reader)
 		close(writer)

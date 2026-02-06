@@ -12,6 +12,12 @@ func Ifel[T any](ok bool, a T, b T) T {
 	}
 	return b
 }
+func IfelFunc[T any](ok bool, a func() T, b func() T) T {
+	if ok {
+		return a()
+	}
+	return b()
+}
 
 func getConfigPath() string {
     // 获取可执行文件路径
