@@ -116,25 +116,13 @@ func startMonitor() (chan *ClipItem, chan *ClipItem, error) {
 			// 监听文本
 			text := clipboard.Read(clipboard.FmtText)
 			if len(text) > 0 {
-				itemType := TypeText
-
-				reader <- &ClipItem{
-					Type:     itemType,
-					Content:  append([]byte(nil), text...),
-					Hash:     fmt.Sprintf("%x", md5.Sum(text)),
-					Time:     time.Now(),
-				}
+				reader <- NewClipItem(TypeText, text)
 			}
 
 			// 监听图片
 			image := clipboard.Read(clipboard.FmtImage)
 			if len(image) > 0 {
-				reader <- &ClipItem{
-					Type:     TypeImage,
-					Content:  append([]byte(nil), image...),
-					Hash:     fmt.Sprintf("%x", md5.Sum(image)),
-					Time:     time.Now(),
-				}
+				reader <- NewClipItem(TypeImage, image)
 			}
 		}
 	}()
@@ -236,20 +224,10 @@ func main() {
 				copyH := menu.AddSubMenuItem("复制Hex", "")
 				copyRGB := menu.AddSubMenuItem("复制RGB", "")
 				copyH.Click(func() {
-					writer <- &ClipItem{
-						Type:     TypeText,
-						Content:  append([]byte(nil), hexT...),
-						Hash:     fmt.Sprintf("%x", md5.Sum([]byte(hexT))),
-						Time:     time.Now(),
-					}
+					writer <- NewClipItem(TypeText, []byte(hexT))
 				})
 				copyRGB.Click(func() {
-					writer <- &ClipItem{
-						Type:     TypeText,
-						Content:  append([]byte(nil), rgbT...),
-						Hash:     fmt.Sprintf("%x", md5.Sum([]byte(rgbT))),
-						Time:     time.Now(),
-					}
+					writer <- NewClipItem(TypeText, []byte(rgbT))
 				})
 				return true
 			}	

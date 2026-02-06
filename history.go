@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/md5"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -12,12 +14,41 @@ const (
 	TypeImage
 )
 
+type ItemFrom int
+
+const (
+	FromLocal ItemFrom = iota
+	FromRemote
+)
+
 type ClipItem struct {
 	Type     ItemType `json:"type"`
 	Content  []byte `json:"content"`
 	Hash     string `json:"hash"`
 	Time     time.Time `json:"time"`
+	From     ItemFrom `json:"from"`
 }
+
+func NewClipItem(itemType ItemType, content []byte) *ClipItem{
+	return &ClipItem{
+		Type:     itemType,
+		Content:  append([]byte{}, content...),
+		Hash:     fmt.Sprintf("%x", md5.Sum(content)),
+		Time:     time.Now(),
+		From:     FromLocal,
+	}
+}
+
+func NewClipItemFromRemote(itemType ItemType, content []byte) *ClipItem{
+	return &ClipItem{
+		Type:     itemType,
+		Content:  append([]byte{}, content...),
+		Hash:     fmt.Sprintf("%x", md5.Sum(content)),
+		Time:     time.Now(),
+		From:     FromRemote,
+	}
+}
+
 
 func (c *ClipItem) Clone() *ClipItem{
 	return &ClipItem{
@@ -25,6 +56,7 @@ func (c *ClipItem) Clone() *ClipItem{
 		Content:  append([]byte{}, c.Content...),
 		Hash:     c.Hash,
 		Time:     c.Time,
+		From:     c.From,
 	}
 }
 
