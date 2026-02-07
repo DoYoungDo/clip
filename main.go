@@ -335,6 +335,7 @@ func main() {
 						if top.Type == TypeText {
 							groups[string(top.Content)] = group
 							delete(groups, name)
+							groupNames[i] = string(top.Content)
 						}else{
 							fmt.Println("不支持重命名图片分组")
 						}
