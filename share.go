@@ -1,9 +1,10 @@
 package main
 
 import (
-	"bufio"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -59,8 +60,14 @@ func (s *ShareServer) Start() {
 					s.mu.Unlock()
 				}()
 				
-				scanner := bufio.NewScanner(c)
-				for scanner.Scan(){}
+				// 保持连接，不读取数据
+				buf := make([]byte, 1)
+				for {
+					_, err := c.Read(buf)
+					if err != nil {
+						break
+					}
+				}
 			}(conn)
 		}
 	}()
@@ -88,9 +95,15 @@ func (s *ShareServer) Share(item *ClipItem) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	
+	// 使用长度前缀协议：4字节长度 + JSON数据
+	length := uint32(len(data))
+	header := make([]byte, 4)
+	binary.BigEndian.PutUint32(header, length)
+	
 	for conn := range s.conns{
+		conn.Write(header)
 		conn.Write(data)
-		conn.Write([]byte("\n"))
 	}
 }
 
@@ -116,20 +129,36 @@ func (c *ShareClient) ConnectTo() bool{
 	}
 	c.conn = conn
 	go func(conn net.Conn) {
-		defer conn.Close()
+		defer func ()  {
+			conn.Close()
 
-		scanner := bufio.NewScanner(conn)
-		for scanner.Scan() {
+			if c.onClose != nil{
+				c.onClose()
+			}
+		}()
+
+		// 使用长度前缀协议读取
+		header := make([]byte, 4)
+		for {
+			// 读取4字节长度头
+			if _, err := io.ReadFull(conn, header); err != nil {
+				break
+			}
+			
+			length := binary.BigEndian.Uint32(header)
+			
+			// 读取完整的JSON数据
+			data := make([]byte, length)
+			if _, err := io.ReadFull(conn, data); err != nil {
+				break
+			}
+			
 			var item ClipItem
-			if err := json.Unmarshal(scanner.Bytes(), &item); err == nil {
+			if err := json.Unmarshal(data, &item); err == nil {
 				if c.onShare != nil{
 					c.onShare(item.CloneToRemote())
 				}
 			}
-		}
-
-		if c.onClose != nil{
-			c.onClose()
 		}
 	}(c.conn)
 	return true;
