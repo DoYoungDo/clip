@@ -26,12 +26,14 @@ func getLocalIP() string {
 }
 
 func NewShareServer() * ShareServer{
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "tcp服务器正在启动..."}
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		panic(err)
 	}
 	addr := ln.Addr().(*net.TCPAddr)
 	addrString := fmt.Sprintf("%v:%v",getLocalIP(),addr.Port)
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("tcp服务器已启动，地址为%s", addrString)}
 	server := &ShareServer{
 		ln: ln,
 		addrString: addrString,
@@ -42,12 +44,14 @@ func NewShareServer() * ShareServer{
 
 func (s *ShareServer) Start() {
 	go func ()  {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "tcp服务器正在监听连接..."}
 		for {
 			conn, err := s.ln.Accept()
 			if err != nil {
 				return
 			}
 
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: "一个客户端已连接"}
 			s.mu.Lock()
 			s.conns[conn] = true
 			s.mu.Unlock()
@@ -74,6 +78,7 @@ func (s *ShareServer) Start() {
 }
 
 func (s *ShareServer) Stop(){
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "tcp服务器正在关闭..."}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -88,6 +93,7 @@ func (s *ShareServer) AddrString() string {
 }
 
 func (s *ShareServer) Share(item *ClipItem) {
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "准备发送剪贴板内容。"}
 	data, err := json.Marshal(item)
 	if(err != nil){
 		return
@@ -101,6 +107,7 @@ func (s *ShareServer) Share(item *ClipItem) {
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint32(header, length)
 	
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("发送剪贴板内容，长度为%d字节", length)}
 	for conn := range s.conns{
 		conn.Write(header)
 		conn.Write(data)
@@ -123,6 +130,7 @@ func NewShareClient(addr string) *ShareClient{
 }
 
 func (c *ShareClient) ConnectTo() bool{
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("正在连接到服务器%s...", c.addr)}
 	conn, err := net.Dial("tcp", c.addr)
 	if err != nil {
 		return false
@@ -144,6 +152,7 @@ func (c *ShareClient) ConnectTo() bool{
 			if _, err := io.ReadFull(conn, header); err != nil {
 				break
 			}
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: "收到剪贴板内容，正在读取..."}
 			
 			length := binary.BigEndian.Uint32(header)
 			
@@ -173,6 +182,7 @@ func (c *ShareClient) OnClose(callback func()){
 }
 
 func (c *ShareClient) Close() {
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在关闭与服务器的连接..."}
 	if c.conn != nil{
 		c.conn.Close()
 	}

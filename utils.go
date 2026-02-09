@@ -31,6 +31,18 @@ func getConfigPath() string {
     return filepath.Join(appDir, "config.json")
 }
 
+func getLogPath() string {
+	// 获取可执行文件路径
+    execPath, err := os.Executable()
+    if err != nil {
+        return ".log" // 降级到当前目录
+    }
+    
+    // 获取应用目录
+    appDir := filepath.Dir(execPath)
+    return filepath.Join(appDir, ".log")
+}
+
 func getColor(str string) (r string, g string, b string, base int, ok bool) {
 	pattern := `(?i)^(?:#(?:([\da-f][\da-f])([\da-f][\da-f])([\da-f][\da-f])|([\da-f])([\da-f])([\da-f]))|\(?(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})(?:\s*,\s*(?:\d|1?\d{2}|2[0-5]{2}))?\)?)$`
 	reg, err := regexp.Compile(pattern)

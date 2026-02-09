@@ -3,7 +3,7 @@
 # macOS App 打包脚本
 
 APP_NAME="Clip"
-VERSION="1.0.0"
+VERSION="1.1.1"
 BUILD_DIR="build"
 APP_DIR="$BUILD_DIR/$APP_NAME.app"
 

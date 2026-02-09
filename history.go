@@ -134,6 +134,7 @@ func (h *History) Delete(index int) {
 	if index < 0 || index >= len(h.items) {
 		return
 	}
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("正在删除历史记录中索引为%d的记录...", index)}
 	h.items = append(h.items[:index], h.items[index+1:]...)
 }
 
@@ -144,6 +145,7 @@ func (h *History) SetMaxSize(max uint) {
 	h.maxSize = max
 
 	if max < (uint)(len(h.items)) {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("历史记录超过新设置的最大值%d，正在删除多余的记录...", max)}
 		h.items = h.items[:max]
 	}
 }

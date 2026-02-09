@@ -15,6 +15,7 @@ type Config struct{
 	HistoryMax uint `json:"history_max"`
 	SingleDelete bool `json:"single_delete"`
 	AutoRecognizeColor bool `json:"auto_recognize_color"`
+	SaveLogToLocal bool `json:"save_log_to_local"`
 	Data HistoryData `json:"data"`
 }
 
@@ -23,6 +24,7 @@ func NewDefaultConfig() *Config{
 		HistoryMax: 50,
 		SingleDelete: false,
 		AutoRecognizeColor: false,
+		SaveLogToLocal: false,
 		Data: HistoryData{
 			History: nil,
 			Groups: make(map[string]HistoryGroupData),
