@@ -3,7 +3,7 @@
 # Windows AMD64 构建脚本
 
 APP_NAME="clip"
-VERSION="1.0.0"
+VERSION="${VERSION:-1.0.0}"
 BUILD_DIR="build"
 
 mkdir -p $BUILD_DIR

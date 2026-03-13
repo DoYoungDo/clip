@@ -3,7 +3,7 @@
 # macOS ARM64 构建脚本
 
 APP_NAME="clip"
-VERSION="1.0.0"
+VERSION="${VERSION:-1.0.0}"
 BUILD_DIR="build"
 
 mkdir -p $BUILD_DIR
@@ -16,7 +16,7 @@ GOARCH=amd64 \
 CGO_CFLAGS="-mmacosx-version-min=10.13 -O2" \
 CGO_LDFLAGS="-mmacosx-version-min=10.13" \
 go build \
-  -ldflags="-s -w -X main.buildVersion=1.0.0" \
+  -ldflags="-s -w" \
   -a \
   -o $BUILD_DIR/${APP_NAME}-darwin-amd64 .
 
