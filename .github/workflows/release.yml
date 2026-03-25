@@ -8,113 +8,98 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   GO_VERSION: "1.24.0"
 
 jobs:
-  prepare-release:
-    name: Prepare release
+  prepare:
+    name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }}
       tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
+      - name: Validate tag format
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "不支持的 tag 格式: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
       - name: Extract tag metadata
         id: meta
         run: |
           echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure GitHub release exists
+  create-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
-            --notes "Automated build for ${GITHUB_REF_NAME}"
-
-  build-macos:
-    name: Build macOS (${{ matrix.arch }})
-    needs: prepare-release
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            runner: macos-14
-            script_arg: ""
-            asset_suffix: darwin-arm64.app.zip
-          - arch: amd64
-            runner: macos-13
-            script_arg: amd
-            asset_suffix: darwin-amd64.app.zip
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Make scripts executable
-        run: chmod +x script/*.sh
-
-      - name: Build macOS app bundle
-        env:
-          VERSION: ${{ needs.prepare-release.outputs.version }}
-        run: |
-          if [ -n "${{ matrix.script_arg }}" ]; then
-            ./script/build-app.sh "${{ matrix.script_arg }}"
+          if gh release view "${{ needs.prepare.outputs.tag }}" >/dev/null 2>&1; then
+            gh release edit "${{ needs.prepare.outputs.tag }}" \
+              --title "${{ needs.prepare.outputs.tag }}" \
+              --notes "Automated build for ${{ needs.prepare.outputs.tag }}"
           else
-            ./script/build-app.sh
+            gh release create "${{ needs.prepare.outputs.tag }}" \
+              --title "${{ needs.prepare.outputs.tag }}" \
+              --notes "Automated build for ${{ needs.prepare.outputs.tag }}"
           fi
 
-      - name: Archive macOS app bundle
-        env:
-          ASSET_NAME: Clip-${{ needs.prepare-release.outputs.version }}-${{ matrix.asset_suffix }}
-        run: |
-          ditto -c -k --keepParent "build/Clip.app" "build/${ASSET_NAME}"
-
-      - name: Upload asset to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ASSET_NAME: Clip-${{ needs.prepare-release.outputs.version }}-${{ matrix.asset_suffix }}
-        run: gh release upload "${{ needs.prepare-release.outputs.tag }}" "build/${ASSET_NAME}" --clobber
-
-  build-linux-and-windows:
+  build:
     name: Build ${{ matrix.target_name }}
-    needs: prepare-release
     runs-on: ${{ matrix.runner }}
+    needs:
+      - prepare
+      - create-release
     strategy:
       fail-fast: false
       matrix:
         include:
+          - target_name: macos-arm64
+            runner: macos-14
+            build_command: ./script/build-app.sh
+            artifact_name_template: Clip-${VERSION}-darwin-arm64.app.zip
+            archive_command: ditto -c -k --keepParent "build/Clip.app" "build/Clip-${VERSION}-darwin-arm64.app.zip"
+            apt_packages: ""
+          - target_name: macos-amd64
+            runner: macos-13
+            build_command: ./script/build-app.sh amd64
+            artifact_name_template: Clip-${VERSION}-darwin-amd64.app.zip
+            archive_command: ditto -c -k --keepParent "build/Clip.app" "build/Clip-${VERSION}-darwin-amd64.app.zip"
+            apt_packages: ""
           - target_name: linux-amd64
             runner: ubuntu-latest
-            build_script: ./script/build-linux-amd64.sh
-            archive_kind: tar.gz
-            binary_name: clip-linux-amd64
+            build_command: ./script/build-linux-amd64.sh
+            artifact_name_template: clip-${VERSION}-linux-amd64.tar.gz
+            archive_command: tar -czf "build/clip-${VERSION}-linux-amd64.tar.gz" -C build clip-linux-amd64
             apt_packages: libayatana-appindicator3-dev libgtk-3-dev
           - target_name: linux-arm64
             runner: ubuntu-24.04-arm
-            build_script: ./script/build-linux-arm64.sh
-            archive_kind: tar.gz
-            binary_name: clip-linux-arm64
+            build_command: ./script/build-linux-arm64.sh
+            artifact_name_template: clip-${VERSION}-linux-arm64.tar.gz
+            archive_command: tar -czf "build/clip-${VERSION}-linux-arm64.tar.gz" -C build clip-linux-arm64
             apt_packages: libayatana-appindicator3-dev libgtk-3-dev
           - target_name: windows-amd64
             runner: ubuntu-latest
-            build_script: ./script/build-win-amd64.sh
-            archive_kind: zip
-            binary_name: clip-windows-amd64.exe
+            build_command: ./script/build-win-amd64.sh
+            artifact_name_template: clip-${VERSION}-windows-amd64.zip
+            archive_command: zip -j "build/clip-${VERSION}-windows-amd64.zip" "build/clip-windows-amd64.exe"
             apt_packages: ""
           - target_name: windows-arm64
             runner: ubuntu-latest
-            build_script: ./script/build-win-arm64.sh
-            archive_kind: zip
-            binary_name: clip-windows-arm64.exe
+            build_command: ./script/build-win-arm64.sh
+            artifact_name_template: clip-${VERSION}-windows-arm64.zip
+            archive_command: zip -j "build/clip-${VERSION}-windows-arm64.zip" "build/clip-windows-arm64.exe"
             apt_packages: ""
     steps:
       - name: Check out source
@@ -134,24 +119,47 @@ jobs:
       - name: Make scripts executable
         run: chmod +x script/*.sh
 
-      - name: Run packaging script
+      - name: Build target
         env:
-          VERSION: ${{ needs.prepare-release.outputs.version }}
-        run: ${{ matrix.build_script }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: ${{ matrix.build_command }}
 
       - name: Archive build artifact
+        id: archive
         env:
-          VERSION: ${{ needs.prepare-release.outputs.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          asset_path="build/clip-${VERSION}-${{ matrix.target_name }}.${{ matrix.archive_kind }}"
-          if [ "${{ matrix.archive_kind }}" = "tar.gz" ]; then
-            tar -czf "${asset_path}" -C build "${{ matrix.binary_name }}"
-          else
-            zip -j "${asset_path}" "build/${{ matrix.binary_name }}"
-          fi
-          echo "ASSET_PATH=${asset_path}" >> "$GITHUB_ENV"
+          asset_name="${{ matrix.artifact_name_template }}"
+          eval '${{ matrix.archive_command }}'
+          echo "asset_path=build/${asset_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload asset to release
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target_name }}
+          path: ${{ steps.archive.outputs.asset_path }}
+          if-no-files-found: error
+
+  publish-assets:
+    name: Publish release assets
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build
+    steps:
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Upload assets to release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.prepare-release.outputs.tag }}" "${ASSET_PATH}" --clobber
+        run: |
+          shopt -s nullglob
+          files=(release-assets/*/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "没有可上传的构建产物" >&2
+            exit 1
+          fi
+          gh release upload "${{ needs.prepare.outputs.tag }}" "${files[@]}" --clobber

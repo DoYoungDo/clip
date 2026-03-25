@@ -1,22 +1,27 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Linux ARM64 构建脚本
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APP_NAME="clip"
 VERSION="${VERSION:-1.0.0}"
-BUILD_DIR="build"
+BUILD_DIR="$ROOT_DIR/build"
 
-mkdir -p $BUILD_DIR
+mkdir -p "$BUILD_DIR"
 
 echo "编译 Linux ARM64..."
-GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o $BUILD_DIR/${APP_NAME}-linux-arm64 .
+(cd "$ROOT_DIR" && GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "$BUILD_DIR/${APP_NAME}-linux-arm64" .)
 
 # 创建 desktop 文件和图标
-if [ -f "script/icon.png" ]; then
+if [ -f "$SCRIPT_DIR/icon.png" ]; then
     echo "为 Linux 创建 desktop 文件..."
-    cp script/icon.png $BUILD_DIR/clip.png
+    cp "$SCRIPT_DIR/icon.png" "$BUILD_DIR/clip.png"
     
-    cat > $BUILD_DIR/clip.desktop << EOF
+    cat > "$BUILD_DIR/clip.desktop" << EOF
 [Desktop Entry]
 Name=Clip
 Comment=Clipboard History Tool

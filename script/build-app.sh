@@ -1,29 +1,33 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # macOS App 打包脚本
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APP_NAME="Clip"
 VERSION="${VERSION:-1.1.1}"
-BUILD_DIR="build"
+BUILD_DIR="$ROOT_DIR/build"
 APP_DIR="$BUILD_DIR/$APP_NAME.app"
 
 echo "开始打包 macOS 应用..."
 
-rm -rf $APP_DIR
+rm -rf "$APP_DIR"
 
 # 编译
 echo "编译..."
 
-SCRIPT_DIR="$(dirname "$0")"
 DIST_NAME="clip-darwin-arm64"
 
-case "$1" in
-    "amd")
-        $SCRIPT_DIR/build-mac-amd64.sh
+case "${1:-}" in
+    "amd"|"amd64")
+        "$SCRIPT_DIR/build-mac-amd64.sh"
         DIST_NAME="clip-darwin-amd64"
         ;;
     *)
-        $SCRIPT_DIR/build-mac-arm64.sh
+        "$SCRIPT_DIR/build-mac-arm64.sh"
 esac
 
 # 创建 .app 目录结构
@@ -32,14 +36,14 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 # 移动可执行文件
-mv $BUILD_DIR/$DIST_NAME "$APP_DIR/Contents/MacOS/$APP_NAME"
+mv "$BUILD_DIR/$DIST_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
 
 # 复制图标文件
-if [ -f "script/icon.icns" ]; then
+if [ -f "$SCRIPT_DIR/icon.icns" ]; then
     echo "添加应用图标..."
-    cp script/icon.icns "$APP_DIR/Contents/Resources/icon.icns"
+    cp "$SCRIPT_DIR/icon.icns" "$APP_DIR/Contents/Resources/icon.icns"
 else
-    echo "警告: 未找到 script/icon.icns 文件，跳过图标设置"
+    echo "警告: 未找到 $SCRIPT_DIR/icon.icns 文件，跳过图标设置"
 fi
 
 # 创建 Info.plist
