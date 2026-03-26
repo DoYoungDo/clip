@@ -103,6 +103,66 @@ func (m *clipboardMonitor) Done() <-chan struct{} {
 	return m.done
 }
 
+func selectClipboardChange(lastTextHash string, lastImageHash string, text []byte, image []byte) (*ClipItem, string, string) {
+	textHash := ""
+	imageHash := ""
+	if len(text) > 0 {
+		textHash = calcClipItemHash(TypeText, text)
+	}
+	if len(image) > 0 {
+		imageHash = calcClipItemHash(TypeImage, image)
+	}
+
+	textChanged := textHash != "" && textHash != lastTextHash
+	imageChanged := imageHash != "" && imageHash != lastImageHash
+
+	switch {
+	case imageChanged:
+		return NewClipItem(TypeImage, image), textHash, imageHash
+	case textChanged:
+		return NewClipItem(TypeText, text), textHash, imageHash
+	default:
+		return nil, textHash, imageHash
+	}
+}
+
+type echoSuppressor struct {
+	mu        sync.Mutex
+	itemType  ItemType
+	hash      string
+	expiresAt time.Time
+}
+
+func (e *echoSuppressor) Mark(item *ClipItem, ttl time.Duration) {
+	if item == nil {
+		return
+	}
+
+	e.mu.Lock()
+	e.itemType = item.Type
+	e.hash = item.Hash
+	e.expiresAt = time.Now().Add(ttl)
+	e.mu.Unlock()
+}
+
+func (e *echoSuppressor) ShouldSuppress(item *ClipItem) bool {
+	if item == nil {
+		return false
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if time.Now().After(e.expiresAt) {
+		return false
+	}
+	if e.itemType == item.Type && e.hash != "" && e.hash == item.Hash {
+		e.hash = ""
+		e.expiresAt = time.Time{}
+		return true
+	}
+	return false
+}
+
 // 全局状态
 var (
 	global_clear_state                                   = Normal
@@ -204,6 +264,8 @@ func startMonitor() (*clipboardMonitor, error) {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "开始监听剪贴板, 每200毫秒检查一次..."}
 		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
+		lastTextHash := ""
+		lastImageHash := ""
 
 		sendItem := func(item *ClipItem) bool {
 			select {
@@ -220,12 +282,11 @@ func startMonitor() (*clipboardMonitor, error) {
 				return
 			case <-ticker.C:
 				text := clipboard.Read(clipboard.FmtText)
-				if len(text) > 0 && !sendItem(NewClipItem(TypeText, text)) {
-					return
-				}
-
 				image := clipboard.Read(clipboard.FmtImage)
-				if len(image) > 0 && !sendItem(NewClipItem(TypeImage, image)) {
+				item, nextTextHash, nextImageHash := selectClipboardChange(lastTextHash, lastImageHash, text, image)
+				lastTextHash = nextTextHash
+				lastImageHash = nextImageHash
+				if item != nil && !sendItem(item) {
 					return
 				}
 			}
@@ -246,6 +307,7 @@ func main() {
 	var groupsMu sync.RWMutex
 	var shareClientsMu sync.RWMutex
 	var shareServerMu sync.RWMutex
+	echoGuard := &echoSuppressor{}
 
 	loadLocalState := func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在加载配置和历史记录..."}
@@ -322,6 +384,10 @@ func main() {
 				return
 			case item := <-monitor.reader:
 				if item == nil {
+					continue
+				}
+				if item.From == FromLocal && echoGuard.ShouldSuppress(item) {
+					global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("忽略回声剪贴板内容: %s", formatMenuItem(item))}
 					continue
 				}
 
@@ -712,6 +778,7 @@ func main() {
 					global_history_share_clients[addr] = shareClient
 					shareClientsMu.Unlock()
 					shareClient.OnShared(func(item *ClipItem) {
+						echoGuard.Mark(item, 3*time.Second)
 						history.Add(item)
 						writer <- item
 					})

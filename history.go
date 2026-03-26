@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"sync"
 	"time"
 )
@@ -22,50 +27,73 @@ const (
 )
 
 type ClipItem struct {
-	Type     ItemType `json:"type"`
-	Content  []byte `json:"content"`
-	Hash     string `json:"hash"`
-	Time     time.Time `json:"time"`
-	From     ItemFrom `json:"from"`
+	Type    ItemType  `json:"type"`
+	Content []byte    `json:"content"`
+	Hash    string    `json:"hash"`
+	Time    time.Time `json:"time"`
+	From    ItemFrom  `json:"from"`
 }
 
-func NewClipItem(itemType ItemType, content []byte) *ClipItem{
+func calcClipItemHash(itemType ItemType, content []byte) string {
+	if itemType != TypeImage {
+		return fmt.Sprintf("%x", md5.Sum(content))
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(content))
+	if err != nil {
+		return fmt.Sprintf("%x", md5.Sum(content))
+	}
+
+	bounds := img.Bounds()
+	hasher := md5.New()
+	_, _ = fmt.Fprintf(hasher, "%d:%d|", bounds.Dx(), bounds.Dy())
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			_, _ = fmt.Fprintf(hasher, "%04x%04x%04x%04x", r, g, b, a)
+		}
+	}
+
+	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+func NewClipItem(itemType ItemType, content []byte) *ClipItem {
 	return &ClipItem{
-		Type:     itemType,
-		Content:  append([]byte{}, content...),
-		Hash:     fmt.Sprintf("%x", md5.Sum(content)),
-		Time:     time.Now(),
-		From:     FromLocal,
+		Type:    itemType,
+		Content: append([]byte{}, content...),
+		Hash:    calcClipItemHash(itemType, content),
+		Time:    time.Now(),
+		From:    FromLocal,
 	}
 }
 
-func NewClipItemFromRemote(itemType ItemType, content []byte) *ClipItem{
+func NewClipItemFromRemote(itemType ItemType, content []byte) *ClipItem {
 	return &ClipItem{
-		Type:     itemType,
-		Content:  append([]byte{}, content...),
-		Hash:     fmt.Sprintf("%x", md5.Sum(content)),
-		Time:     time.Now(),
-		From:     FromRemote,
+		Type:    itemType,
+		Content: append([]byte{}, content...),
+		Hash:    calcClipItemHash(itemType, content),
+		Time:    time.Now(),
+		From:    FromRemote,
 	}
 }
 
-func (c *ClipItem) CloneToRemote() *ClipItem{
+func (c *ClipItem) CloneToRemote() *ClipItem {
 	return &ClipItem{
-		Type:     c.Type,
-		Content:  append([]byte{}, c.Content...),
-		Hash:     c.Hash,
-		Time:     c.Time,
-		From:     FromRemote,
+		Type:    c.Type,
+		Content: append([]byte{}, c.Content...),
+		Hash:    c.Hash,
+		Time:    c.Time,
+		From:    FromRemote,
 	}
 }
 
-func (c *ClipItem) Clone() *ClipItem{
+func (c *ClipItem) Clone() *ClipItem {
 	return &ClipItem{
-		Type:     c.Type,
-		Content:  append([]byte{}, c.Content...),
-		Hash:     c.Hash,
-		Time:     c.Time,
-		From:     c.From,
+		Type:    c.Type,
+		Content: append([]byte{}, c.Content...),
+		Hash:    c.Hash,
+		Time:    c.Time,
+		From:    c.From,
 	}
 }
 
@@ -86,7 +114,7 @@ func (h *History) Add(item *ClipItem) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if len(h.items) > 0{
+	if len(h.items) > 0 {
 		top := h.items[0]
 		if top != nil && top.Type == item.Type && top.Hash == item.Hash {
 			return false

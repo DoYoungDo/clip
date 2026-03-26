@@ -1,6 +1,12 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/png"
+	"testing"
+)
 
 func resetTestLogChannel() {
 	global_log_channel = make(chan LogEntry, 256)
@@ -69,5 +75,39 @@ func TestClipItemCloneIndependence(t *testing.T) {
 	}
 	if remote.From != FromRemote {
 		t.Fatalf("远端克隆应标记为 FromRemote")
+	}
+}
+
+func TestImageHashStableAcrossPNGEncoding(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	img.Set(1, 0, color.NRGBA{R: 0, G: 255, B: 0, A: 255})
+	img.Set(0, 1, color.NRGBA{R: 0, G: 0, B: 255, A: 255})
+	img.Set(1, 1, color.NRGBA{R: 255, G: 255, B: 0, A: 255})
+
+	var fast bytes.Buffer
+	encoderFast := png.Encoder{CompressionLevel: png.BestSpeed}
+	if err := encoderFast.Encode(&fast, img); err != nil {
+		t.Fatalf("快速编码图片失败: %v", err)
+	}
+
+	var small bytes.Buffer
+	encoderSmall := png.Encoder{CompressionLevel: png.BestCompression}
+	if err := encoderSmall.Encode(&small, img); err != nil {
+		t.Fatalf("高压缩编码图片失败: %v", err)
+	}
+
+	itemFast := NewClipItem(TypeImage, fast.Bytes())
+	itemSmall := NewClipItem(TypeImage, small.Bytes())
+	if itemFast.Hash != itemSmall.Hash {
+		t.Fatalf("相同像素图片应生成相同稳定哈希: %s != %s", itemFast.Hash, itemSmall.Hash)
+	}
+
+	history := NewHistory(5)
+	if !history.Add(itemFast) {
+		t.Fatalf("第一次图片添加应成功")
+	}
+	if history.Add(itemSmall) {
+		t.Fatalf("相同像素图片应被历史去重")
 	}
 }
