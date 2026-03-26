@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/md5"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -251,12 +250,12 @@ func main() {
 	loadLocalState := func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在加载配置和历史记录..."}
 
-		localConfig := NewDefaultConfig()
-		data, err := os.ReadFile(getConfigPath())
-		if err == nil {
-			if err := json.Unmarshal(data, localConfig); err != nil {
-				global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("加载配置失败: %v", err)}
-			}
+		localConfig, source, err := loadMergedConfig()
+		if err != nil {
+			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("加载配置失败: %v", err)}
+			localConfig = NewDefaultConfig()
+		} else {
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("配置加载来源: %s", source)}
 		}
 
 		config_history_max = localConfig.HistoryMax
@@ -301,19 +300,7 @@ func main() {
 		config.Data.GroupNames = append([]string(nil), groupNames...)
 		groupsMu.RUnlock()
 
-		data, err := json.Marshal(config)
-		if err != nil {
-			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("序列化配置失败: %v", err)}
-			return
-		}
-
-		path := getConfigPath()
-		if err := ensureParentDir(path); err != nil {
-			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("创建配置目录失败: %v", err)}
-			return
-		}
-
-		if err := os.WriteFile(path, data, 0644); err != nil {
+		if err := saveConfigToPath(getConfigPath(), config); err != nil {
 			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("保存配置失败: %v", err)}
 		}
 	}

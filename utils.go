@@ -8,6 +8,8 @@ import (
 
 const appDataDirName = "Clip"
 
+var legacyConfigPathOverride string
+
 func getAppDataDir() string {
 	configDir, err := os.UserConfigDir()
 	if err == nil {
@@ -41,6 +43,17 @@ func IfelFunc[T any](ok bool, a func() T, b func() T) T {
 
 func getConfigPath() string {
 	return filepath.Join(getAppDataDir(), "config.json")
+}
+
+func getLegacyConfigPath() string {
+	if legacyConfigPathOverride != "" {
+		return legacyConfigPathOverride
+	}
+	execPath, err := os.Executable()
+	if err != nil {
+		return "config.json"
+	}
+	return filepath.Join(filepath.Dir(execPath), "config.json")
 }
 
 func getLogPath() string {
