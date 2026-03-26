@@ -6,6 +6,26 @@ import (
 	"regexp"
 )
 
+const appDataDirName = "Clip"
+
+func getAppDataDir() string {
+	configDir, err := os.UserConfigDir()
+	if err == nil {
+		return filepath.Join(configDir, appDataDirName)
+	}
+
+	execPath, err := os.Executable()
+	if err == nil {
+		return filepath.Dir(execPath)
+	}
+
+	return "."
+}
+
+func ensureParentDir(path string) error {
+	return os.MkdirAll(filepath.Dir(path), 0755)
+}
+
 func Ifel[T any](ok bool, a T, b T) T {
 	if ok {
 		return a
@@ -20,33 +40,17 @@ func IfelFunc[T any](ok bool, a func() T, b func() T) T {
 }
 
 func getConfigPath() string {
-    // 获取可执行文件路径
-    execPath, err := os.Executable()
-    if err != nil {
-        return "config.json" // 降级到当前目录
-    }
-    
-    // 获取应用目录
-    appDir := filepath.Dir(execPath)
-    return filepath.Join(appDir, "config.json")
+	return filepath.Join(getAppDataDir(), "config.json")
 }
 
 func getLogPath() string {
-	// 获取可执行文件路径
-    execPath, err := os.Executable()
-    if err != nil {
-        return ".log" // 降级到当前目录
-    }
-    
-    // 获取应用目录
-    appDir := filepath.Dir(execPath)
-    return filepath.Join(appDir, ".log")
+	return filepath.Join(getAppDataDir(), "clip.log")
 }
 
 func getColor(str string) (r string, g string, b string, base int, ok bool) {
 	pattern := `(?i)^(?:#(?:([\da-f][\da-f])([\da-f][\da-f])([\da-f][\da-f])|([\da-f])([\da-f])([\da-f]))|\(?(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})(?:\s*,\s*(?:\d|1?\d{2}|2[0-5]{2}))?\)?)$`
 	reg, err := regexp.Compile(pattern)
-	if err != nil{
+	if err != nil {
 		return "", "", "", 0, false
 	}
 
