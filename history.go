@@ -193,3 +193,16 @@ func NewGroup(name string, active bool, maxSize uint) *Group {
 		SingleDelete: false,
 	}
 }
+
+func syncLatestHistoryToGroup(history *History, group *Group) bool {
+	if history == nil || group == nil || group.History == nil {
+		return false
+	}
+
+	top := history.GetTop()
+	if top == nil {
+		return false
+	}
+
+	return group.History.Add(top.Clone())
+}

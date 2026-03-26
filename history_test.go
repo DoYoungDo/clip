@@ -111,3 +111,41 @@ func TestImageHashStableAcrossPNGEncoding(t *testing.T) {
 		t.Fatalf("相同像素图片应被历史去重")
 	}
 }
+
+func TestSyncLatestHistoryToGroupAddsTopItem(t *testing.T) {
+	history := NewHistory(10)
+	group := NewGroup("工作", false, 10)
+
+	older := NewClipItem(TypeText, []byte("older"))
+	latest := NewClipItem(TypeText, []byte("latest"))
+	history.Add(older)
+	history.Add(latest)
+
+	if !syncLatestHistoryToGroup(history, group) {
+		t.Fatalf("应将最近一条历史记录同步到分组")
+	}
+
+	top := group.History.GetTop()
+	if top == nil || string(top.Content) != "latest" {
+		t.Fatalf("分组顶部记录应为 latest，实际为 %#v", top)
+	}
+}
+
+func TestSyncLatestHistoryToGroupHandlesEmptyAndDuplicate(t *testing.T) {
+	group := NewGroup("工作", false, 10)
+
+	if syncLatestHistoryToGroup(NewHistory(10), group) {
+		t.Fatalf("空历史记录不应同步成功")
+	}
+
+	history := NewHistory(10)
+	item := NewClipItem(TypeText, []byte("latest"))
+	history.Add(item)
+
+	if !syncLatestHistoryToGroup(history, group) {
+		t.Fatalf("首次同步应成功")
+	}
+	if syncLatestHistoryToGroup(history, group) {
+		t.Fatalf("重复同步同一条记录不应再次添加")
+	}
+}

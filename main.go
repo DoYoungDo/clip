@@ -567,6 +567,9 @@ func main() {
 						active := group.Active
 						groupsMu.Unlock()
 						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("%s分组%s", Ifel(active, "激活", "取消激活"), group.Name)}
+						if active && syncLatestHistoryToGroup(history, group) {
+							global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("同步最近一条历史记录到分组 %s", group.Name)}
+						}
 					})
 
 					btnRename.Click(func() {
