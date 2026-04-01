@@ -52,12 +52,12 @@ func (b *BaiduTranslator) Enable(secret string) bool {
 func (b *BaiduTranslator) Name() string {
 	name := "百度翻译"
 	if !b.isEnabled {
-		return fmt.Sprintf("%v%v", name, "请确保当前剪切板的内容为：appid 密钥")
+		return fmt.Sprintf("%v%v", name, "，请确保当前剪切板的内容为：appid 密钥")
 	}
 	return name
 }
 
-type TranslationResult struct {
+type BaiduTranslationResult struct {
 	Result []struct {
 		Src string `json:"src"`
 		Dis string `json:"dst"`
@@ -82,7 +82,7 @@ func (b *BaiduTranslator) Translate(text string, lang TransLang) (string, error)
 	if err != nil {
 		return "", err
 	}
-	var result TranslationResult
+	var result BaiduTranslationResult
 
 	body, _ := io.ReadAll(resp.Body)
 	err = json.Unmarshal(body, &result)
