@@ -52,7 +52,7 @@ func (b *BaiduTranslator) Enable(secret string) bool {
 func (b *BaiduTranslator) Name() string {
 	name := "百度翻译"
 	if !b.isEnabled {
-		return fmt.Sprintf("%v%v", name, "请确保当前剪切板的内容为：appid key")
+		return fmt.Sprintf("%v%v", name, "请确保当前剪切板的内容为：appid 密钥")
 	}
 	return name
 }
