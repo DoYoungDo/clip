@@ -173,7 +173,7 @@ var (
 	global_history_share_server  *ShareServer            = nil
 	global_history_share_clients map[string]*ShareClient = make(map[string]*ShareClient)
 	global_log_channel                                   = make(chan LogEntry, 128)
-	global_translate_to_lang     string                  = "zh"
+	global_translate_to_lang     translator.TransLang    = translator.ZH
 	global_translator            translator.Translator   = nil
 	global_menu_title            string                  = ""
 )
@@ -190,6 +190,12 @@ var (
 	config_auto_recognize_color      = false
 	config_save_log_to_local         = false
 )
+
+func formatMenuTitle(text string) string {
+	lines := strings.Split(text, "\n")
+	line := lines[0]
+	return truncateString(line, 40)
+}
 
 func formatMenuItem(item *ClipItem) string {
 	text := string(item.Content)
@@ -400,10 +406,10 @@ func main() {
 					global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("新剪贴板内容: %s", formatMenuItem(item))}
 
 					if item.Type == TypeText && global_translator != nil {
-						translatedText, err := global_translator.Translate(string(item.Content))
+						translatedText, err := global_translator.Translate(string(item.Content), global_translate_to_lang)
 						if err == nil {
 							global_menu_title = translatedText
-							systray.SetTitle(global_menu_title)
+							systray.SetTitle(formatMenuTitle(fmt.Sprintf("%v: %v", global_translator.Name(), global_menu_title)))
 						}
 					}
 				}
@@ -839,10 +845,14 @@ func main() {
 
 			transLateMenu := menu.AddSubMenuItemCheckbox("翻译", "", global_translator != nil)
 			{
-				transLateMenu.AddSubMenuItem("翻译为："+global_translate_to_lang, "").Click(func() {
-
-				})
-
+				langMenu := transLateMenu.AddSubMenuItem("翻译为："+string(global_translate_to_lang), "")
+				{
+					for _, lang := range translator.TransLangFactory() {
+						langMenu.AddSubMenuItemCheckbox(string(lang), "", global_translate_to_lang == lang).Click(func() {
+							global_translate_to_lang = lang
+						})
+					}
+				}
 				for _, translatorImp := range translator.TranslatorFactory() {
 					transLateMenu.AddSubMenuItemCheckbox(translatorImp.Name(), "", global_translator == translatorImp).Click(func() {
 						if global_translator == translatorImp && translatorImp.IsEnabled() {
