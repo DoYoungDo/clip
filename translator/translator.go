@@ -19,6 +19,7 @@ type Translator interface {
 var TranslatorFactory = sync.OnceValue(func() []Translator {
 	return []Translator{
 		NewBaiduTranslator(),
+		NewYouDaoTranslator(),
 	}
 })
 
