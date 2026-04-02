@@ -350,6 +350,30 @@ func main() {
 		}
 
 		groupNames = localConfig.Data.GroupNames
+
+		{
+			if localConfig.Translator != nil {
+				global_translate_to_lang = translator.TransLang(localConfig.Translator.Lang)
+
+				translators := translator.TranslatorFactory()
+				translatorsMap := make(map[string]translator.Translator)
+				for _, t := range translators {
+					translatorsMap[t.Id()] = t
+				}
+
+				if localConfig.Translator.CurrentTranslatorId != nil {
+					if t, ok := translatorsMap[*localConfig.Translator.CurrentTranslatorId]; ok {
+						global_translator = t
+					}
+				}
+
+				for _, inited := range localConfig.Translator.InitedTranslators {
+					if t, ok := translatorsMap[inited.Id]; ok {
+						t.Enable(inited.Secret)
+					}
+				}
+			}
+		}
 	}
 
 	saveLocalState := func() {
@@ -371,6 +395,31 @@ func main() {
 		}
 		config.Data.GroupNames = append([]string(nil), groupNames...)
 		groupsMu.RUnlock()
+
+		{
+			config.Translator = &TranslatorData{
+				Lang: string(global_translate_to_lang),
+			}
+			if global_translator != nil {
+				id := global_translator.Id()
+				config.Translator.CurrentTranslatorId = &id
+			}
+
+			translators := translator.TranslatorFactory()
+			inited := make([]struct {
+				Id     string `json:"id"`
+				Secret string `json:"secret"`
+			}, 0, len(translators))
+			for _, translator := range translators {
+				if translator.IsEnabled() {
+					inited = append(inited, struct {
+						Id     string `json:"id"`
+						Secret string `json:"secret"`
+					}{Id: translator.Id(), Secret: translator.Secret()})
+				}
+			}
+			config.Translator.InitedTranslators = inited
+		}
 
 		if err := saveConfigToPath(getConfigPath(), config); err != nil {
 			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("保存配置失败: %v", err)}
