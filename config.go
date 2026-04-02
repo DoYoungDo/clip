@@ -20,12 +20,23 @@ type HistoryData struct {
 	GroupNames []string                    `json:"group_names"`
 }
 
+type TranslatorInitData struct {
+	Id string `json:"id"`
+}
+
+type TranslatorData struct {
+	Lang                string               `json:"lang"`
+	CurrentTranslatorId *string              `json:"current_translator_id"`
+	InitedTranslators   []TranslatorInitData `json:"inited_translators"`
+}
+
 type Config struct {
-	HistoryMax         uint        `json:"history_max"`
-	SingleDelete       bool        `json:"single_delete"`
-	AutoRecognizeColor bool        `json:"auto_recognize_color"`
-	SaveLogToLocal     bool        `json:"save_log_to_local"`
-	Data               HistoryData `json:"data"`
+	HistoryMax         uint            `json:"history_max"`
+	SingleDelete       bool            `json:"single_delete"`
+	AutoRecognizeColor bool            `json:"auto_recognize_color"`
+	SaveLogToLocal     bool            `json:"save_log_to_local"`
+	Data               HistoryData     `json:"data"`
+	Translator         *TranslatorData `json:"translator_data"`
 }
 
 func NewDefaultConfig() *Config {

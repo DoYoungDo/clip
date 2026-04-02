@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"clip/translator"
 	"crypto/md5"
 	"fmt"
 	"os"
@@ -172,6 +173,9 @@ var (
 	global_history_share_server  *ShareServer            = nil
 	global_history_share_clients map[string]*ShareClient = make(map[string]*ShareClient)
 	global_log_channel                                   = make(chan LogEntry, 128)
+	global_translate_to_lang     translator.TransLang    = translator.ZH
+	global_translator            translator.Translator   = nil
+	global_menu_title            string                  = ""
 )
 
 // 全局常量
@@ -186,6 +190,12 @@ var (
 	config_auto_recognize_color      = false
 	config_save_log_to_local         = false
 )
+
+func formatMenuTitle(text string) string {
+	lines := strings.Split(text, "\n")
+	line := lines[0]
+	return truncateString(line, 40)
+}
 
 func formatMenuItem(item *ClipItem) string {
 	text := string(item.Content)
@@ -340,6 +350,40 @@ func main() {
 		}
 
 		groupNames = localConfig.Data.GroupNames
+
+		{
+			if localConfig.Translator != nil {
+				global_translate_to_lang = translator.TransLang(localConfig.Translator.Lang)
+				currentTranslatorID := ""
+				if localConfig.Translator.CurrentTranslatorId != nil {
+					currentTranslatorID = *localConfig.Translator.CurrentTranslatorId
+				}
+
+				translators := translator.TranslatorFactory()
+				translatorsMap := make(map[string]translator.Translator)
+				for _, t := range translators {
+					translatorsMap[t.Id()] = t
+				}
+				global_translator = nil
+
+				for _, inited := range localConfig.Translator.InitedTranslators {
+					if t, ok := translatorsMap[inited.Id]; ok {
+						secret, err := resolveTranslatorSecret(inited.Id, translatorSecretStore)
+						if err != nil {
+							global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("加载翻译器 %s 的密钥失败: %v", t.Name(), err)}
+							continue
+						}
+						if t.Enable(secret) {
+							if currentTranslatorID == t.Id() {
+								global_translator = t
+							}
+							continue
+						}
+						global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("启用翻译器 %s 失败", t.Name())}
+					}
+				}
+			}
+		}
 	}
 
 	saveLocalState := func() {
@@ -361,6 +405,23 @@ func main() {
 		}
 		config.Data.GroupNames = append([]string(nil), groupNames...)
 		groupsMu.RUnlock()
+
+		{
+			config.Translator = &TranslatorData{
+				Lang: string(global_translate_to_lang),
+			}
+			if global_translator != nil {
+				id := global_translator.Id()
+				config.Translator.CurrentTranslatorId = &id
+			}
+
+			translators := translator.TranslatorFactory()
+			inited, err := buildTranslatorInitData(translators, translatorSecretStore)
+			if err != nil {
+				global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("保存翻译器密钥失败: %v", err)}
+			}
+			config.Translator.InitedTranslators = inited
+		}
 
 		if err := saveConfigToPath(getConfigPath(), config); err != nil {
 			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("保存配置失败: %v", err)}
@@ -394,6 +455,14 @@ func main() {
 				succ := history.Add(item)
 				if succ {
 					global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("新剪贴板内容: %s", formatMenuItem(item))}
+
+					if item.Type == TypeText && global_translator != nil {
+						translatedText, err := global_translator.Translate(string(item.Content), global_translate_to_lang)
+						if err == nil {
+							global_menu_title = translatedText
+							systray.SetTitle(formatMenuTitle(fmt.Sprintf("%v: %v", global_translator.Name(), global_menu_title)))
+						}
+					}
 				}
 
 				groupsMu.RLock()
@@ -424,6 +493,19 @@ func main() {
 	systray.Run(func() {
 		systray.SetIcon(logo)
 		systray.SetTooltip("Clip")
+
+		flushMenuTitle := func() {
+			if global_menu_title != "" {
+				translatedItem := NewClipItem(TypeText, []byte(global_menu_title))
+				echoGuard.Mark(translatedItem, 3*time.Second)
+
+				history.Add(translatedItem)
+				writer <- translatedItem
+
+				global_menu_title = ""
+				systray.SetTitle(global_menu_title)
+			}
+		}
 
 		addColorRecognizeMenuAction := func(menu *systray.MenuItem, item *ClipItem) bool {
 			if !config_auto_recognize_color || item.Type != TypeText {
@@ -720,100 +802,130 @@ func main() {
 			})
 
 			shareMenu := menu.AddSubMenuItem("局域网共享", "")
-			shareServerMu.RLock()
-			server := global_history_share_server
-			serverLabel := ""
-			if server != nil {
-				serverLabel = fmt.Sprintf("(%v)", server.AddrString())
-			}
-			shareServerMu.RUnlock()
-
-			shareMenu.AddSubMenuItemCheckbox("局域网共享"+serverLabel, "", server != nil).Click(func() {
+			{
 				shareServerMu.RLock()
-				currentServer := global_history_share_server
+				server := global_history_share_server
+				serverLabel := ""
+				if server != nil {
+					serverLabel = fmt.Sprintf("(%v)", server.AddrString())
+				}
 				shareServerMu.RUnlock()
 
-				global_log_channel <- LogEntry{Kind: KindInfo, Content: Ifel(currentServer == nil, "启动局域网共享", "关闭局域网共享")}
-				if currentServer == nil {
-					newServer, err := NewShareServer()
-					if err != nil {
-						global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("启动局域网共享失败: %v", err)}
+				shareMenu.AddSubMenuItemCheckbox("局域网共享"+serverLabel, "", server != nil).Click(func() {
+					shareServerMu.RLock()
+					currentServer := global_history_share_server
+					shareServerMu.RUnlock()
+
+					global_log_channel <- LogEntry{Kind: KindInfo, Content: Ifel(currentServer == nil, "启动局域网共享", "关闭局域网共享")}
+					if currentServer == nil {
+						newServer, err := NewShareServer()
+						if err != nil {
+							global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("启动局域网共享失败: %v", err)}
+							return
+						}
+						shareServerMu.Lock()
+						global_history_share_server = newServer
+						shareServerMu.Unlock()
+						writer <- NewClipItem(TypeText, []byte(newServer.AddrString()))
+						newServer.Start()
+					} else {
+						currentServer.Stop()
+						shareServerMu.Lock()
+						global_history_share_server = nil
+						shareServerMu.Unlock()
+					}
+				})
+
+				shareMenu.AddSubMenuItem("连接到", "").Click(func() {
+					global_log_channel <- LogEntry{Kind: KindInfo, Content: "连接到局域网共享"}
+					top := history.GetTop()
+					if top == nil || top.Type != TypeText {
+						global_log_channel <- LogEntry{Kind: KindError, Content: "连接到局域网共享失败: 历史记录为空，无法获取地址"}
 						return
 					}
-					shareServerMu.Lock()
-					global_history_share_server = newServer
-					shareServerMu.Unlock()
-					writer <- NewClipItem(TypeText, []byte(newServer.AddrString()))
-					newServer.Start()
-				} else {
-					currentServer.Stop()
-					shareServerMu.Lock()
-					global_history_share_server = nil
-					shareServerMu.Unlock()
-				}
-			})
 
-			shareMenu.AddSubMenuItem("连接到", "").Click(func() {
-				global_log_channel <- LogEntry{Kind: KindInfo, Content: "连接到局域网共享"}
-				top := history.GetTop()
-				if top == nil || top.Type != TypeText {
-					global_log_channel <- LogEntry{Kind: KindError, Content: "连接到局域网共享失败: 历史记录为空，无法获取地址"}
-					return
-				}
+					addr := string(top.Content)
+					if addr == "" {
+						global_log_channel <- LogEntry{Kind: KindError, Content: "连接到局域网共享失败: 地址为空"}
+						return
+					}
 
-				addr := string(top.Content)
-				if addr == "" {
-					global_log_channel <- LogEntry{Kind: KindError, Content: "连接到局域网共享失败: 地址为空"}
-					return
-				}
+					shareClientsMu.RLock()
+					_, exists := global_history_share_clients[addr]
+					shareClientsMu.RUnlock()
+					if exists {
+						global_log_channel <- LogEntry{Kind: KindError, Content: "连接到局域网共享失败: 已经连接过了"}
+						return
+					}
+
+					shareClient := NewShareClient(addr)
+					if shareClient.ConnectTo() {
+						shareClientsMu.Lock()
+						global_history_share_clients[addr] = shareClient
+						shareClientsMu.Unlock()
+						shareClient.OnShared(func(item *ClipItem) {
+							echoGuard.Mark(item, 3*time.Second)
+							history.Add(item)
+							writer <- item
+						})
+						shareClient.OnClose(func() {
+							shareClientsMu.Lock()
+							delete(global_history_share_clients, addr)
+							shareClientsMu.Unlock()
+						})
+					}
+				})
 
 				shareClientsMu.RLock()
-				_, exists := global_history_share_clients[addr]
-				shareClientsMu.RUnlock()
-				if exists {
-					global_log_channel <- LogEntry{Kind: KindError, Content: "连接到局域网共享失败: 已经连接过了"}
-					return
+				clientSnapshot := make(map[string]*ShareClient, len(global_history_share_clients))
+				for addr, client := range global_history_share_clients {
+					clientSnapshot[addr] = client
 				}
+				shareClientsMu.RUnlock()
 
-				shareClient := NewShareClient(addr)
-				if shareClient.ConnectTo() {
-					shareClientsMu.Lock()
-					global_history_share_clients[addr] = shareClient
-					shareClientsMu.Unlock()
-					shareClient.OnShared(func(item *ClipItem) {
-						echoGuard.Mark(item, 3*time.Second)
-						history.Add(item)
-						writer <- item
-					})
-					shareClient.OnClose(func() {
+				for addr, client := range clientSnapshot {
+					shareMenu.AddSubMenuItemCheckbox(addr, "", true).Click(func() {
+						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("断开与局域网共享%s的连接", addr)}
+						client.Close()
 						shareClientsMu.Lock()
 						delete(global_history_share_clients, addr)
 						shareClientsMu.Unlock()
 					})
 				}
-			})
+			}
+
+			transLateMenu := menu.AddSubMenuItemCheckbox("翻译", "", global_translator != nil)
+			{
+				langMenu := transLateMenu.AddSubMenuItem("翻译为："+string(global_translate_to_lang), "")
+				{
+					for _, lang := range translator.TransLangFactory() {
+						langMenu.AddSubMenuItemCheckbox(string(lang), "", global_translate_to_lang == lang).Click(func() {
+							global_translate_to_lang = lang
+						})
+					}
+				}
+				for _, translatorImp := range translator.TranslatorFactory() {
+					transLateMenu.AddSubMenuItemCheckbox(translatorImp.Name(), "", global_translator == translatorImp).Click(func() {
+						if global_translator == translatorImp && translatorImp.IsEnabled() {
+							global_translator = nil
+							return
+						}
+
+						top := history.GetTop()
+						if top == nil || top.Type != TypeText {
+							return
+						}
+						if translatorImp.IsEnabled() || translatorImp.Enable(string(top.Content)) {
+							global_translator = translatorImp
+						}
+					})
+				}
+			}
 
 			menu.AddSubMenuItemCheckbox("退出时保存日志", "", config_save_log_to_local).Click(func() {
 				config_save_log_to_local = !config_save_log_to_local
 				global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", config_save_log_to_local)}
 			})
-
-			shareClientsMu.RLock()
-			clientSnapshot := make(map[string]*ShareClient, len(global_history_share_clients))
-			for addr, client := range global_history_share_clients {
-				clientSnapshot[addr] = client
-			}
-			shareClientsMu.RUnlock()
-
-			for addr, client := range clientSnapshot {
-				shareMenu.AddSubMenuItemCheckbox(addr, "", true).Click(func() {
-					global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("断开与局域网共享%s的连接", addr)}
-					client.Close()
-					shareClientsMu.Lock()
-					delete(global_history_share_clients, addr)
-					shareClientsMu.Unlock()
-				})
-			}
 		}
 
 		addSearchMenuAction := func() {
@@ -845,6 +957,7 @@ func main() {
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "点击托盘图标"}
 			global_show_menu_state = Click
 			systray.ResetMenu()
+			flushMenuTitle()
 
 			if addHistoryMenuAction() {
 				addSeparator()
@@ -859,6 +972,7 @@ func main() {
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "右键点击托盘图标"}
 			global_show_menu_state = RClick
 			systray.ResetMenu()
+			flushMenuTitle()
 
 			if addHistoryMenuAction() {
 				addSeparator()
