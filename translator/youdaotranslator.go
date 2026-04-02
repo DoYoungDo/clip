@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var youdaoTranslateEndpoint = "https://openapi.youdao.com/api"
+
 type YouDaoTranslator struct {
 	isEnabled bool
 	appkey    string
@@ -92,13 +94,23 @@ func (y *YouDaoTranslator) Translate(text string, lang TransLang) (string, error
 	p.Set("signType", "v3")
 	p.Set("curtime", fmt.Sprintf("%v", salt))
 
-	resp, err := http.Get(fmt.Sprintf("https://openapi.youdao.com/api?%v", p.Encode()))
+	resp, err := http.Get(fmt.Sprintf("%s?%v", youdaoTranslateEndpoint, p.Encode()))
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("请求失败: http %d", resp.StatusCode)
+	}
+
 	var result youDaoTranslationResult
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
 	err = json.Unmarshal(body, &result)
 	if err != nil || result.ErrorCode != "0" {
 		return "", fmt.Errorf("请求失败")

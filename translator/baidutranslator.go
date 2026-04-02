@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var baiduTranslateEndpoint = "https://fanyi-api.baidu.com/api/trans/vip/translate"
+
 type BaiduTranslator struct {
 	isEnabled bool
 	appid     string
@@ -72,7 +74,9 @@ func (b *BaiduTranslator) Name() string {
 }
 
 type BaiduTranslationResult struct {
-	Result []struct {
+	ErrorCode string `json:"error_code"`
+	ErrorMsg  string `json:"error_msg"`
+	Result    []struct {
 		Src string `json:"src"`
 		Dis string `json:"dst"`
 	} `json:"trans_result"`
@@ -92,17 +96,34 @@ func (b *BaiduTranslator) Translate(text string, lang TransLang) (string, error)
 	p.Set("salt", fmt.Sprintf("%v", salt))
 	p.Set("sign", fmt.Sprintf("%v", sign))
 
-	resp, err := http.Get(fmt.Sprintf("https://fanyi-api.baidu.com/api/trans/vip/translate?%v", p.Encode()))
+	resp, err := http.Get(fmt.Sprintf("%s?%v", baiduTranslateEndpoint, p.Encode()))
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("请求失败: http %d", resp.StatusCode)
+	}
+
 	var result BaiduTranslationResult
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
 	err = json.Unmarshal(body, &result)
 	if err != nil {
 		return "", err
 	}
+	if result.ErrorCode != "" {
+		return "", fmt.Errorf("请求失败: %s %s", result.ErrorCode, result.ErrorMsg)
+	}
+	if len(result.Result) == 0 {
+		return "", fmt.Errorf("请求失败: 未返回翻译结果")
+	}
+
 	translations := make([]string, len(result.Result))
 	for i, item := range result.Result {
 		translations[i] = item.Dis
