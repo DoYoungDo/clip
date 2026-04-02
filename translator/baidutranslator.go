@@ -17,6 +17,20 @@ type BaiduTranslator struct {
 	key       string
 }
 
+// Secret implements [Translator].
+func (b *BaiduTranslator) Secret() string {
+	if !b.isEnabled {
+		return ""
+	}
+
+	return fmt.Sprintf("%v %v", b.appid, b.key)
+}
+
+// Id implements [Translator].
+func (b *BaiduTranslator) Id() string {
+	return "BaiduTranslator"
+}
+
 func NewBaiduTranslator() *BaiduTranslator {
 	return &BaiduTranslator{
 		isEnabled: false,

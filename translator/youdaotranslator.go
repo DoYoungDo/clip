@@ -17,6 +17,19 @@ type YouDaoTranslator struct {
 	secret    string
 }
 
+// Secret implements [Translator].
+func (y *YouDaoTranslator) Secret() string {
+	if !y.isEnabled {
+		return ""
+	}
+	return fmt.Sprintf("%v %v", y.appkey, y.secret)
+}
+
+// Id implements [Translator].
+func (y *YouDaoTranslator) Id() string {
+	return "YouDaoTranslator"
+}
+
 func NewYouDaoTranslator() *YouDaoTranslator {
 	return &YouDaoTranslator{
 		isEnabled: false,

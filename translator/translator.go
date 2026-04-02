@@ -10,10 +10,12 @@ const (
 )
 
 type Translator interface {
+	Id() string
 	Name() string
 	Translate(text string, lang TransLang) (string, error)
 	Enable(secret string) bool
 	IsEnabled() bool
+	Secret() string
 }
 
 var TranslatorFactory = sync.OnceValue(func() []Translator {
