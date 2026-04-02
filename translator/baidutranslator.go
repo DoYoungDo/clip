@@ -92,7 +92,7 @@ func (b *BaiduTranslator) Translate(text string, lang TransLang) (string, error)
 	p.Set("salt", fmt.Sprintf("%v", salt))
 	p.Set("sign", fmt.Sprintf("%v", sign))
 
-	resp, err := http.Get(fmt.Sprintf("http://api.fanyi.baidu.com/api/trans/vip/translate?%v", p.Encode()))
+	resp, err := http.Get(fmt.Sprintf("https://fanyi-api.baidu.com/api/trans/vip/translate?%v", p.Encode()))
 	if err != nil {
 		return "", err
 	}
