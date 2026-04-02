@@ -20,13 +20,14 @@ type HistoryData struct {
 	GroupNames []string                    `json:"group_names"`
 }
 
+type TranslatorInitData struct {
+	Id string `json:"id"`
+}
+
 type TranslatorData struct {
-	Lang                string  `json:"lang"`
-	CurrentTranslatorId *string `json:"current_translator_id"`
-	InitedTranslators   []struct {
-		Id     string `json:"id"`
-		Secret string `json:"secret"`
-	} `json:"inited_translators"`
+	Lang                string               `json:"lang"`
+	CurrentTranslatorId *string              `json:"current_translator_id"`
+	InitedTranslators   []TranslatorInitData `json:"inited_translators"`
 }
 
 type Config struct {

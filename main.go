@@ -354,22 +354,32 @@ func main() {
 		{
 			if localConfig.Translator != nil {
 				global_translate_to_lang = translator.TransLang(localConfig.Translator.Lang)
+				currentTranslatorID := ""
+				if localConfig.Translator.CurrentTranslatorId != nil {
+					currentTranslatorID = *localConfig.Translator.CurrentTranslatorId
+				}
 
 				translators := translator.TranslatorFactory()
 				translatorsMap := make(map[string]translator.Translator)
 				for _, t := range translators {
 					translatorsMap[t.Id()] = t
 				}
-
-				if localConfig.Translator.CurrentTranslatorId != nil {
-					if t, ok := translatorsMap[*localConfig.Translator.CurrentTranslatorId]; ok {
-						global_translator = t
-					}
-				}
+				global_translator = nil
 
 				for _, inited := range localConfig.Translator.InitedTranslators {
 					if t, ok := translatorsMap[inited.Id]; ok {
-						t.Enable(inited.Secret)
+						secret, err := resolveTranslatorSecret(inited.Id, translatorSecretStore)
+						if err != nil {
+							global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("加载翻译器 %s 的密钥失败: %v", t.Name(), err)}
+							continue
+						}
+						if t.Enable(secret) {
+							if currentTranslatorID == t.Id() {
+								global_translator = t
+							}
+							continue
+						}
+						global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("启用翻译器 %s 失败", t.Name())}
 					}
 				}
 			}
@@ -406,17 +416,9 @@ func main() {
 			}
 
 			translators := translator.TranslatorFactory()
-			inited := make([]struct {
-				Id     string `json:"id"`
-				Secret string `json:"secret"`
-			}, 0, len(translators))
-			for _, translator := range translators {
-				if translator.IsEnabled() {
-					inited = append(inited, struct {
-						Id     string `json:"id"`
-						Secret string `json:"secret"`
-					}{Id: translator.Id(), Secret: translator.Secret()})
-				}
+			inited, err := buildTranslatorInitData(translators, translatorSecretStore)
+			if err != nil {
+				global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("保存翻译器密钥失败: %v", err)}
 			}
 			config.Translator.InitedTranslators = inited
 		}
