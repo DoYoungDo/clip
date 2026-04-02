@@ -5,11 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch file",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}"
+        },
+        {
             "name": "Attach to Process",
             "type": "go",
             "request": "attach",
             "mode": "local",
-            "processId": 7272
+            "processId": 50408
         }
     ]
 }
