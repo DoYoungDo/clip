@@ -922,6 +922,9 @@ func main() {
 				}
 			}
 
+			menu.AddSubMenuItem("打开配置文件目录", "").Click(func() {
+				openDir(getAppDataDir())
+			})
 			menu.AddSubMenuItemCheckbox("退出时保存日志", "", config_save_log_to_local).Click(func() {
 				config_save_log_to_local = !config_save_log_to_local
 				global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", config_save_log_to_local)}

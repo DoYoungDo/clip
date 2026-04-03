@@ -2,8 +2,10 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 )
 
 const appDataDirName = "Clip"
@@ -78,4 +80,16 @@ func getColor(str string) (r string, g string, b string, base int, ok bool) {
 	ok = r != "" && g != "" && b != ""
 
 	return r, g, b, Ifel(groups[1] != "", 16, 10), ok
+}
+func openDir(path string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", path)
+	case "windows":
+		cmd = exec.Command("explorer", path)
+	default: // linux
+		cmd = exec.Command("xdg-open", path)
+	}
+	return cmd.Start()
 }
