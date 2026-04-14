@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clip — 跨平台剪贴板管理工具</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --border: #2a2a30;
+      --accent: #7c6af7;
+      --accent2: #5eead4;
+      --text: #e8e8f0;
+      --muted: #888899;
+      --radius: 14px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem;
+      height: 60px;
+      background: rgba(13,13,15,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { display: flex; align-items: center; gap: .6rem; font-weight: 700; font-size: 1.1rem; }
+    .nav-logo img { width: 28px; height: 28px; border-radius: 6px; }
+    nav a {
+      color: var(--muted); text-decoration: none; font-size: .9rem;
+      transition: color .2s;
+    }
+    nav a:hover { color: var(--text); }
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .btn-gh {
+      display: flex; align-items: center; gap: .4rem;
+      padding: .4rem .9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text) !important;
+      font-size: .85rem;
+      transition: border-color .2s;
+    }
+    .btn-gh:hover { border-color: var(--accent); }
+
+    /* HERO */
+    .hero {
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(124,106,247,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-block;
+      padding: .3rem .9rem;
+      background: rgba(124,106,247,.12);
+      border: 1px solid rgba(124,106,247,.3);
+      border-radius: 999px;
+      font-size: .8rem;
+      color: #a89cf7;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.15;
+      margin-bottom: 1.2rem;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 2.5rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      padding: .7rem 1.8rem;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: .95rem;
+      transition: opacity .2s, transform .15s;
+    }
+    .btn-primary:hover { opacity: .88; transform: translateY(-1px); }
+    .btn-secondary {
+      padding: .7rem 1.8rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: .95rem;
+      transition: border-color .2s, transform .15s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+    /* PLATFORM BADGES */
+    .platforms {
+      display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap;
+      margin-top: 2.5rem;
+    }
+    .platform-tag {
+      padding: .3rem .8rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    /* FEATURES */
+    section { padding: 5rem 1.5rem; }
+    .section-label {
+      text-align: center;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--accent);
+      margin-bottom: .8rem;
+    }
+    .section-title {
+      text-align: center;
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      margin-bottom: .8rem;
+    }
+    .section-sub {
+      text-align: center;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 3rem;
+      font-size: .95rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.6rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+    .feature-icon { font-size: 1.8rem; margin-bottom: .8rem; }
+    .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: .4rem; }
+    .feature-card p { font-size: .88rem; color: var(--muted); }
+
+    /* HOW IT WORKS */
+    .steps { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.2rem; }
+    .step {
+      display: flex; gap: 1.2rem; align-items: flex-start;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem 1.6rem;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 32px; height: 32px;
+      background: rgba(124,106,247,.15);
+      border: 1px solid rgba(124,106,247,.3);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem; font-weight: 700; color: var(--accent);
+    }
+    .step h3 { font-size: .95rem; font-weight: 600; margin-bottom: .3rem; }
+    .step p { font-size: .87rem; color: var(--muted); }
+
+    /* DOWNLOAD */
+    .download-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .dl-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem;
+      text-align: center;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color .2s, transform .2s;
+      display: block;
+    }
+    .dl-card:hover { border-color: var(--accent2); transform: translateY(-2px); }
+    .dl-icon { font-size: 2rem; margin-bottom: .6rem; }
+    .dl-card h3 { font-size: .95rem; font-weight: 600; margin-bottom: .2rem; }
+    .dl-card p { font-size: .8rem; color: var(--muted); }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      color: var(--muted);
+      font-size: .85rem;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      nav { padding: 0 1rem; }
+      .nav-links { gap: .8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <img src="../logo.png" alt="Clip logo" />
+    Clip
+  </div>
+  <div class="nav-links">
+    <a href="#features">特性</a>
+    <a href="#howto">使用</a>
+    <a href="#download">下载</a>
+    <a href="https://github.com/DoYoungDo/clip" class="btn-gh" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">📋 系统托盘 · 轻量 · 跨平台</div>
+  <h1>更聪明的<br /><span>剪贴板管理</span></h1>
+  <p>自动记录历史、分组管理、颜色识别、实时翻译，还能在局域网内与另一台电脑共享剪贴板。</p>
+  <div class="hero-actions">
+    <a href="https://github.com/DoYoungDo/clip/releases/latest" class="btn-primary" target="_blank" rel="noopener">立即下载</a>
+    <a href="https://github.com/DoYoungDo/clip" class="btn-secondary" target="_blank" rel="noopener">查看源码</a>
+  </div>
+  <div class="platforms">
+    <span class="platform-tag">🍎 macOS 10.12+</span>
+    <span class="platform-tag">🪟 Windows 10+</span>
+    <span class="platform-tag">🐧 Linux X11/Wayland</span>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <p class="section-label">核心功能</p>
+  <h2 class="section-title">不只是历史记录</h2>
+  <p class="section-sub">Clip 把剪贴板变成一个真正有用的工作台。</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">📋</div>
+      <h3>自动历史记录</h3>
+      <p>实时捕获文本与图片，最多保存 300 条，退出时可持久化到本地。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📁</div>
+      <h3>分组管理</h3>
+      <p>创建命名分组，激活后所有新内容自动归入该分组，随时切换。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔍</div>
+      <h3>快速搜索</h3>
+      <p>复制关键词后一键搜索，在海量历史中秒定位目标内容。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌈</div>
+      <h3>颜色识别转换</h3>
+      <p>自动识别 Hex 色值，一键转换为 RGB，设计师必备。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌍</div>
+      <h3>实时翻译</h3>
+      <p>接入百度翻译 / 有道翻译，复制即翻译，结果显示在托盘标题。密钥安全存储在系统凭据库。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌐</div>
+      <h3>局域网共享</h3>
+      <p>一台开启服务端，另一台连接，两台电脑剪贴板实时同步，甚至可以"聊天"。</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="howto" style="background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <p class="section-label">快速上手</p>
+  <h2 class="section-title">三步开始使用</h2>
+  <p class="section-sub">安装后常驻系统托盘，左键查看历史，右键访问全部功能。</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <h3>下载并运行</h3>
+        <p>从 Releases 页面下载对应平台的可执行文件，双击运行，图标出现在系统托盘。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <h3>左键查看历史</h3>
+        <p>点击任意条目即可复制到剪贴板，支持文本与图片。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <h3>右键配置功能</h3>
+        <p>开启翻译、颜色识别、局域网共享，或创建分组管理不同类别的内容。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section id="download" class="download-section">
+  <p class="section-label">下载</p>
+  <h2 class="section-title">选择你的平台</h2>
+  <p class="section-sub">所有版本均可在 GitHub Releases 页面获取。</p>
+  <div class="download-grid">
+    <a href="https://github.com/DoYoungDo/clip/releases/latest" class="dl-card" target="_blank" rel="noopener">
+      <div class="dl-icon">🍎</div>
+      <h3>macOS</h3>
+      <p>Apple Silicon &amp; Intel</p>
+    </a>
+    <a href="https://github.com/DoYoungDo/clip/releases/latest" class="dl-card" target="_blank" rel="noopener">
+      <div class="dl-icon">🪟</div>
+      <h3>Windows</h3>
+      <p>x64 &amp; ARM64</p>
+    </a>
+    <a href="https://github.com/DoYoungDo/clip/releases/latest" class="dl-card" target="_blank" rel="noopener">
+      <div class="dl-icon">🐧</div>
+      <h3>Linux</h3>
+      <p>x64 &amp; ARM64</p>
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    GPL-3.0 License &nbsp;·&nbsp;
+    <a href="https://github.com/DoYoungDo/clip" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/DoYoungDo/clip/issues" target="_blank" rel="noopener">反馈问题</a>
+  </p>
+  <p style="margin-top:.5rem; font-size:.8rem;">Built with ❤️ by DoYoung</p>
+</footer>
+
+</body>
+</html>
