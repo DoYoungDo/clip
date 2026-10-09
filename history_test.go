@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
 	"image"
 	"image/color"
@@ -270,5 +271,75 @@ func TestHistoryRemoveDuplicatesKeepsNewest(t *testing.T) {
 	}
 	if removed := history.RemoveDuplicates(); removed != 0 {
 		t.Fatalf("再次去重不应移除记录，实际 %d", removed)
+	}
+}
+
+func referenceImageHash(t *testing.T, content []byte) string {
+	t.Helper()
+	img, _, err := image.Decode(bytes.NewReader(content))
+	if err != nil {
+		t.Fatalf("参考实现解码失败: %v", err)
+	}
+
+	bounds := img.Bounds()
+	hasher := md5.New()
+	_, _ = fmt.Fprintf(hasher, "%d:%d|", bounds.Dx(), bounds.Dy())
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			_, _ = fmt.Fprintf(hasher, "%04x%04x%04x%04x", r, g, b, a)
+		}
+	}
+	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+func newGradientPNG(t testing.TB, w, h int) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.NRGBA{R: uint8(x), G: uint8(y), B: uint8(x + y), A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("编码图片失败: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func TestCalcClipItemHashImageMatchesReference(t *testing.T) {
+	pixels := []color.NRGBA{
+		{R: 0, G: 0, B: 0, A: 0},
+		{R: 255, G: 255, B: 255, A: 255},
+		{R: 255, G: 0, B: 0, A: 255},
+		{R: 0, G: 255, B: 0, A: 128},
+		{R: 0, G: 0, B: 255, A: 1},
+		{R: 1, G: 2, B: 3, A: 4},
+		{R: 254, G: 253, B: 252, A: 251},
+		{R: 16, G: 32, B: 48, A: 64},
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	for i := 0; i < 16; i++ {
+		img.Set(i%4, i/4, pixels[i%len(pixels)])
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("编码图片失败: %v", err)
+	}
+	content := buf.Bytes()
+
+	got := calcClipItemHash(TypeImage, content)
+	want := referenceImageHash(t, content)
+	if got != want {
+		t.Fatalf("图片哈希与参考实现不一致: got %s want %s", got, want)
+	}
+}
+
+func BenchmarkCalcClipItemHashImage(b *testing.B) {
+	data := newGradientPNG(b, 1920, 1080)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = calcClipItemHash(TypeImage, data)
 	}
 }

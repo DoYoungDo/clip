@@ -34,6 +34,17 @@ type ClipItem struct {
 	From    ItemFrom  `json:"from"`
 }
 
+const hexDigits = "0123456789abcdef"
+
+func appendHex16(dst []byte, v uint16) []byte {
+	return append(dst,
+		hexDigits[(v>>12)&0xf],
+		hexDigits[(v>>8)&0xf],
+		hexDigits[(v>>4)&0xf],
+		hexDigits[v&0xf],
+	)
+}
+
 func calcClipItemHash(itemType ItemType, content []byte) string {
 	if itemType != TypeImage {
 		return fmt.Sprintf("%x", md5.Sum(content))
@@ -44,27 +55,44 @@ func calcClipItemHash(itemType ItemType, content []byte) string {
 		return fmt.Sprintf("%x", md5.Sum(content))
 	}
 
+	// 逐像素按 "%04x%04x%04x%04x" 的 ASCII 文本流写入哈希，
+	// 输出与早期 fmt.Fprintf 实现保持完全一致，但避免每像素格式化的开销。
 	bounds := img.Bounds()
 	hasher := md5.New()
 	_, _ = fmt.Fprintf(hasher, "%d:%d|", bounds.Dx(), bounds.Dy())
+	buf := make([]byte, 0, 64*1024)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, a := img.At(x, y).RGBA()
-			_, _ = fmt.Fprintf(hasher, "%04x%04x%04x%04x", r, g, b, a)
+			buf = appendHex16(buf, uint16(r))
+			buf = appendHex16(buf, uint16(g))
+			buf = appendHex16(buf, uint16(b))
+			buf = appendHex16(buf, uint16(a))
+			if len(buf) >= 64*1024 {
+				_, _ = hasher.Write(buf)
+				buf = buf[:0]
+			}
 		}
+	}
+	if len(buf) > 0 {
+		_, _ = hasher.Write(buf)
 	}
 
 	return fmt.Sprintf("%x", hasher.Sum(nil))
 }
 
-func NewClipItem(itemType ItemType, content []byte) *ClipItem {
+func newClipItemWithHash(itemType ItemType, content []byte, hash string) *ClipItem {
 	return &ClipItem{
 		Type:    itemType,
 		Content: append([]byte{}, content...),
-		Hash:    calcClipItemHash(itemType, content),
+		Hash:    hash,
 		Time:    time.Now(),
 		From:    FromLocal,
 	}
+}
+
+func NewClipItem(itemType ItemType, content []byte) *ClipItem {
+	return newClipItemWithHash(itemType, content, calcClipItemHash(itemType, content))
 }
 
 func NewClipItemFromRemote(itemType ItemType, content []byte) *ClipItem {
