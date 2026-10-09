@@ -1,9 +1,9 @@
-package main
+package app
 
 import (
 	"errors"
 
-	"clip/translator"
+	"clip/internal/translator"
 	keyring "github.com/zalando/go-keyring"
 )
 

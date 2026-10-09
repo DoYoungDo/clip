@@ -14,7 +14,7 @@ BUILD_DIR="$ROOT_DIR/build"
 mkdir -p "$BUILD_DIR"
 
 echo "编译 Linux AMD64..."
-(cd "$ROOT_DIR" && GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "$BUILD_DIR/${APP_NAME}-linux-amd64" .)
+(cd "$ROOT_DIR" && GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "$BUILD_DIR/${APP_NAME}-linux-amd64" ./cmd/clip)
 
 # 创建 desktop 文件和图标
 if [ -f "$SCRIPT_DIR/icon.png" ]; then

@@ -1,10 +1,10 @@
-package main
+package app
 
 import (
 	"fmt"
 	"sync"
 
-	"clip/translator"
+	"clip/internal/translator"
 	"github.com/energye/systray"
 )
 

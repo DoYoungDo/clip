@@ -1,11 +1,11 @@
-package main
+package app
 
 import (
 	"sync"
 	"testing"
 	"time"
 
-	"clip/translator"
+	"clip/internal/translator"
 )
 
 type stubTranslator struct {

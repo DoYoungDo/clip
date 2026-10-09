@@ -1,10 +1,10 @@
-package main
+package app
 
 import (
 	"errors"
 	"testing"
 
-	"clip/translator"
+	"clip/internal/translator"
 )
 
 type fakeTranslator struct {

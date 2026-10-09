@@ -1,11 +1,11 @@
-package main
+package app
 
 import (
 	"fmt"
 	"strconv"
 	"time"
 
-	"clip/translator"
+	"clip/internal/translator"
 	"github.com/energye/systray"
 )
 

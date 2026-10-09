@@ -24,7 +24,7 @@ echo "编译 macOS AMD64..."
   go build \
     -ldflags="-s -w" \
     -a \
-    -o "$BUILD_DIR/${APP_NAME}-darwin-amd64" .)
+    -o "$BUILD_DIR/${APP_NAME}-darwin-amd64" ./cmd/clip)
 
 echo "macOS AMD64 编译完成: $BUILD_DIR/${APP_NAME}-darwin-amd64"
 echo "提示: 使用 ./build-app.sh 创建完整的 .app 应用包"
