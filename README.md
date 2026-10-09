@@ -25,6 +25,8 @@
 ./script/build-win-amd64.sh     # Windows
 ```
 
+> **提示**：macOS 应用签名需要购买证书，作者没有证书，因此打包的 macOS 应用均未签名。如需强行使用，请参考：[mac 安装未知应用常见问题](https://doyoungdo.github.io/essay/#/Other/mac_install_unknown_app)
+
 ## 使用
 
 ### 基本操作
