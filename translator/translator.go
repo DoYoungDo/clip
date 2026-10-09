@@ -1,6 +1,12 @@
 package translator
 
-import "sync"
+import (
+	"net/http"
+	"sync"
+	"time"
+)
+
+var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 type TransLang string
 
@@ -20,6 +26,7 @@ type Translator interface {
 
 var TranslatorFactory = sync.OnceValue(func() []Translator {
 	return []Translator{
+		NewAITranslator(),
 		NewBaiduTranslator(),
 		NewYouDaoTranslator(),
 	}
