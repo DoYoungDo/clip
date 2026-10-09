@@ -10,7 +10,7 @@ import (
 )
 
 func (a *App) onTrayReady() {
-	systray.SetIcon(logo)
+	systray.SetTemplateIcon(logoTemplate, logo)
 	systray.SetTooltip("Clip")
 
 	systray.SetOnClick(a.onTrayClick)
