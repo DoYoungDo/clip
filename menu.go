@@ -26,7 +26,10 @@ func (a *App) onTrayClick(menu systray.IMenu) {
 	if a.addHistoryMenuAction() {
 		addSeparator()
 	}
-	a.addGroupMenuAction()
+	if a.addGroupMenuAction() {
+		addSeparator()
+	}
+	a.addSearchMenuAction()
 
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "显示菜单"}
 	menu.ShowMenu()
