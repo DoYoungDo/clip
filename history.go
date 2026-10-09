@@ -155,15 +155,30 @@ func (h *History) Clear() {
 	h.items = []*ClipItem{}
 }
 
-func (h *History) Delete(index int) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if index < 0 || index >= len(h.items) {
-		return
+func (h *History) Delete(item *ClipItem) bool {
+	if item == nil {
+		return false
 	}
-	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("正在删除历史记录中索引为%d的记录...", index)}
-	h.items = append(h.items[:index], h.items[index+1:]...)
+
+	h.mu.Lock()
+	index := -1
+	for i, existing := range h.items {
+		if existing == item {
+			index = i
+			break
+		}
+	}
+	if index >= 0 {
+		h.items = append(h.items[:index], h.items[index+1:]...)
+	}
+	h.mu.Unlock()
+
+	if index < 0 {
+		return false
+	}
+
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在删除历史记录..."}
+	return true
 }
 
 func (h *History) SetMaxSize(max uint) {

@@ -80,7 +80,6 @@ type youDaoTranslationResult struct {
 // Translate implements [Translator].
 func (y *YouDaoTranslator) Translate(text string, lang TransLang) (string, error) {
 	salt := int32(time.Now().Unix())
-	time.Now().UTC()
 	signText := fmt.Sprintf("%v%v%v%v%v", y.appkey, text, salt, salt, y.secret)
 	sign := fmt.Sprintf("%x", sha256.Sum256([]byte(signText)))
 
@@ -94,7 +93,7 @@ func (y *YouDaoTranslator) Translate(text string, lang TransLang) (string, error
 	p.Set("signType", "v3")
 	p.Set("curtime", fmt.Sprintf("%v", salt))
 
-	resp, err := http.Get(fmt.Sprintf("%s?%v", youdaoTranslateEndpoint, p.Encode()))
+	resp, err := httpClient.Get(fmt.Sprintf("%s?%v", youdaoTranslateEndpoint, p.Encode()))
 	if err != nil {
 		return "", err
 	}

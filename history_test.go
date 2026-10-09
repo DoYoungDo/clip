@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"sync"
 	"testing"
 )
 
@@ -47,13 +49,23 @@ func TestHistoryDeleteAndClear(t *testing.T) {
 	history.Add(NewClipItem(TypeText, []byte("two")))
 	history.Add(NewClipItem(TypeText, []byte("three")))
 
-	history.Delete(1)
 	all := history.GetAll()
+	if !history.Delete(all[1]) {
+		t.Fatalf("按指针删除应成功")
+	}
+	all = history.GetAll()
 	if len(all) != 2 {
 		t.Fatalf("删除后期望剩余 2 条，实际 %d", len(all))
 	}
 	if string(all[0].Content) != "three" || string(all[1].Content) != "one" {
 		t.Fatalf("删除结果不正确: got [%s, %s]", string(all[0].Content), string(all[1].Content))
+	}
+
+	if history.Delete(nil) {
+		t.Fatalf("删除 nil 应返回 false")
+	}
+	if history.Delete(NewClipItem(TypeText, []byte("ghost"))) {
+		t.Fatalf("删除不存在的项应返回 false")
 	}
 
 	history.Clear()
@@ -109,6 +121,32 @@ func TestImageHashStableAcrossPNGEncoding(t *testing.T) {
 	}
 	if history.Add(itemSmall) {
 		t.Fatalf("相同像素图片应被历史去重")
+	}
+}
+
+func TestHistoryConcurrentAddDelete(t *testing.T) {
+	resetTestLogChannel()
+	history := NewHistory(100)
+
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			for i := 0; i < 25; i++ {
+				item := NewClipItem(TypeText, []byte(fmt.Sprintf("g%d-%d", g, i)))
+				history.Add(item)
+				all := history.GetAll()
+				if len(all) > 0 {
+					history.Delete(all[len(all)-1])
+				}
+			}
+		}(g)
+	}
+	wg.Wait()
+
+	if got := len(history.GetAll()); got > 100 {
+		t.Fatalf("并发操作后历史条数超出上限: %d", got)
 	}
 }
 
