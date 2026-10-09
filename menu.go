@@ -19,7 +19,7 @@ func (a *App) onTrayReady() {
 
 func (a *App) onTrayClick(menu systray.IMenu) {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "点击托盘图标"}
-	global_show_menu_state = Click
+	a.showMenuState = Click
 	systray.ResetMenu()
 	a.flushMenuTitle()
 
@@ -34,7 +34,7 @@ func (a *App) onTrayClick(menu systray.IMenu) {
 
 func (a *App) onTrayRClick(menu systray.IMenu) {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "右键点击托盘图标"}
-	global_show_menu_state = RClick
+	a.showMenuState = RClick
 	systray.ResetMenu()
 	a.flushMenuTitle()
 
@@ -59,16 +59,18 @@ func (a *App) onTrayRClick(menu systray.IMenu) {
 }
 
 func (a *App) flushMenuTitle() {
-	if global_menu_title != "" {
-		translatedItem := NewClipItem(TypeText, []byte(global_menu_title))
-		a.echoGuard.Mark(translatedItem, 3*time.Second)
-
-		a.history.Add(translatedItem)
-		a.writer <- translatedItem
-
-		global_menu_title = ""
-		systray.SetTitle(global_menu_title)
+	title := a.takeMenuTitle()
+	if title == "" {
+		return
 	}
+
+	translatedItem := NewClipItem(TypeText, []byte(title))
+	a.echoGuard.Mark(translatedItem, 3*time.Second)
+
+	a.history.Add(translatedItem)
+	a.writer <- translatedItem
+
+	systray.SetTitle("")
 }
 
 func addSeparator() {
@@ -85,7 +87,7 @@ func addQuitMenuCmd() {
 }
 
 func (a *App) addColorRecognizeMenuAction(menu *systray.MenuItem, item *ClipItem) bool {
-	if !config_auto_recognize_color || item.Type != TypeText {
+	if !a.configAutoRecognizeColor || item.Type != TypeText {
 		return false
 	}
 
@@ -117,28 +119,28 @@ func (a *App) addColorRecognizeMenuAction(menu *systray.MenuItem, item *ClipItem
 func (a *App) addHistoryMenuAction() bool {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加历史记录项"}
 	all := a.history.GetAll()
-	for i, item := range all {
-		if global_search_enable && !strings.Contains(string(item.Content), global_search_text) {
+	for _, item := range all {
+		if a.searchEnable && !strings.Contains(string(item.Content), a.searchText) {
 			continue
 		}
 
 		menu := systray.AddMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
-		switch global_show_menu_state {
+		switch a.showMenuState {
 		case Click:
 			if !a.addColorRecognizeMenuAction(menu, item) {
 				menu.Click(func() { a.writer <- item })
 			}
 		case RClick:
 			if a.addColorRecognizeMenuAction(menu, item) {
-				if config_single_delete {
+				if a.configSingleDelete {
 					del := menu.AddSubMenuItem("删除", "")
 					del.Click(func() {
 						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("删除历史记录项: %s", formatMenuItem(item))}
-						a.history.Delete(i)
+						a.history.Delete(item)
 					})
 				}
 			} else {
-				if config_single_delete {
+				if a.configSingleDelete {
 					copy := menu.AddSubMenuItem("复制", "")
 					del := menu.AddSubMenuItem("删除", "")
 					copy.Click(func() {
@@ -147,7 +149,7 @@ func (a *App) addHistoryMenuAction() bool {
 					})
 					del.Click(func() {
 						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("删除历史记录项: %s", formatMenuItem(item))}
-						a.history.Delete(i)
+						a.history.Delete(item)
 					})
 				} else {
 					menu.Click(func() { a.writer <- item })

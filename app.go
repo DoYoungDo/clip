@@ -24,17 +24,97 @@ type App struct {
 	shareClients   map[string]*ShareClient
 	shareServerMu  sync.RWMutex
 	shareClientsMu sync.RWMutex
+
+	translateMu     sync.Mutex
+	translator      translator.Translator
+	translateToLang translator.TransLang
+	menuTitle       string
+	translateSeq    uint64
+
+	configHistoryMax         uint
+	configSingleDelete       bool
+	configAutoRecognizeColor bool
+	configSaveLogToLocal     bool
+
+	searchEnable  bool
+	searchText    string
+	showMenuState ShowMenuState
+	clearState    ClearState
 }
 
 func NewApp(logger *AppLogger) *App {
-	return &App{
-		logger:       logger,
-		history:      NewHistory(config_history_max),
-		groups:       make(map[string]*Group),
-		groupNames:   []string{},
-		echoGuard:    &echoSuppressor{},
-		shareClients: make(map[string]*ShareClient),
+	app := &App{
+		logger:           logger,
+		groups:           make(map[string]*Group),
+		groupNames:       []string{},
+		echoGuard:        &echoSuppressor{},
+		shareClients:     make(map[string]*ShareClient),
+		configHistoryMax: const_max_history,
 	}
+	app.history = NewHistory(app.configHistoryMax)
+	return app
+}
+
+func (a *App) currentTranslator() translator.Translator {
+	a.translateMu.Lock()
+	defer a.translateMu.Unlock()
+	return a.translator
+}
+
+func (a *App) setTranslator(t translator.Translator) {
+	a.translateMu.Lock()
+	a.translator = t
+	a.translateMu.Unlock()
+}
+
+func (a *App) currentTranslateToLang() translator.TransLang {
+	a.translateMu.Lock()
+	defer a.translateMu.Unlock()
+	return a.translateToLang
+}
+
+func (a *App) setTranslateToLang(lang translator.TransLang) {
+	a.translateMu.Lock()
+	a.translateToLang = lang
+	a.translateMu.Unlock()
+}
+
+func (a *App) takeMenuTitle() string {
+	a.translateMu.Lock()
+	defer a.translateMu.Unlock()
+	title := a.menuTitle
+	a.menuTitle = ""
+	return title
+}
+
+func (a *App) translateItem(item *ClipItem) {
+	a.translateMu.Lock()
+	t := a.translator
+	lang := a.translateToLang
+	a.translateSeq++
+	seq := a.translateSeq
+	a.translateMu.Unlock()
+
+	if t == nil {
+		return
+	}
+
+	go func() {
+		translatedText, err := t.Translate(string(item.Content), lang)
+		if err != nil {
+			return
+		}
+
+		a.translateMu.Lock()
+		if seq != a.translateSeq {
+			a.translateMu.Unlock()
+			return
+		}
+		a.menuTitle = translatedText
+		a.translateMu.Unlock()
+
+		systray.SetTitle(formatMenuTitle(fmt.Sprintf("%v: %v", t.Name(), translatedText)))
+	}()
 }
 
 func (a *App) loadLocalState() {
@@ -48,12 +128,12 @@ func (a *App) loadLocalState() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("配置加载来源: %s", source)}
 	}
 
-	config_history_max = localConfig.HistoryMax
-	config_single_delete = localConfig.SingleDelete
-	config_auto_recognize_color = localConfig.AutoRecognizeColor
-	config_save_log_to_local = localConfig.SaveLogToLocal
+	a.configHistoryMax = localConfig.HistoryMax
+	a.configSingleDelete = localConfig.SingleDelete
+	a.configAutoRecognizeColor = localConfig.AutoRecognizeColor
+	a.configSaveLogToLocal = localConfig.SaveLogToLocal
 
-	a.history.SetMaxSize(config_history_max)
+	a.history.SetMaxSize(a.configHistoryMax)
 
 	if localConfig.Data.History != nil {
 		a.history.items = localConfig.Data.History
@@ -71,7 +151,7 @@ func (a *App) loadLocalState() {
 
 	{
 		if localConfig.Translator != nil {
-			global_translate_to_lang = translator.TransLang(localConfig.Translator.Lang)
+			a.setTranslateToLang(translator.TransLang(localConfig.Translator.Lang))
 			currentTranslatorID := ""
 			if localConfig.Translator.CurrentTranslatorId != nil {
 				currentTranslatorID = *localConfig.Translator.CurrentTranslatorId
@@ -82,7 +162,7 @@ func (a *App) loadLocalState() {
 			for _, t := range translators {
 				translatorsMap[t.Id()] = t
 			}
-			global_translator = nil
+			a.setTranslator(nil)
 
 			for _, inited := range localConfig.Translator.InitedTranslators {
 				if t, ok := translatorsMap[inited.Id]; ok {
@@ -93,7 +173,7 @@ func (a *App) loadLocalState() {
 					}
 					if t.Enable(secret) {
 						if currentTranslatorID == t.Id() {
-							global_translator = t
+							a.setTranslator(t)
 						}
 						continue
 					}
@@ -108,10 +188,10 @@ func (a *App) saveLocalState() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在保存配置和历史记录..."}
 
 	config := NewDefaultConfig()
-	config.HistoryMax = config_history_max
-	config.SingleDelete = config_single_delete
-	config.AutoRecognizeColor = config_auto_recognize_color
-	config.SaveLogToLocal = config_save_log_to_local
+	config.HistoryMax = a.configHistoryMax
+	config.SingleDelete = a.configSingleDelete
+	config.AutoRecognizeColor = a.configAutoRecognizeColor
+	config.SaveLogToLocal = a.configSaveLogToLocal
 	config.Data.History = a.history.GetAll()
 
 	a.groupsMu.RLock()
@@ -126,10 +206,10 @@ func (a *App) saveLocalState() {
 
 	{
 		config.Translator = &TranslatorData{
-			Lang: string(global_translate_to_lang),
+			Lang: string(a.currentTranslateToLang()),
 		}
-		if global_translator != nil {
-			id := global_translator.Id()
+		if t := a.currentTranslator(); t != nil {
+			id := t.Id()
 			config.Translator.CurrentTranslatorId = &id
 		}
 
@@ -170,12 +250,8 @@ func (a *App) handleClipboardItem(item *ClipItem) {
 	if succ {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("新剪贴板内容: %s", formatMenuItem(item))}
 
-		if item.Type == TypeText && global_translator != nil {
-			translatedText, err := global_translator.Translate(string(item.Content), global_translate_to_lang)
-			if err == nil {
-				global_menu_title = translatedText
-				systray.SetTitle(formatMenuTitle(fmt.Sprintf("%v: %v", global_translator.Name(), global_menu_title)))
-			}
+		if item.Type == TypeText {
+			a.translateItem(item)
 		}
 	}
 
@@ -226,5 +302,5 @@ func (a *App) shutdown() {
 
 	a.monitor.Close()
 	a.saveLocalState()
-	a.logger.FlushToFile(config_save_log_to_local)
+	a.logger.FlushToFile(a.configSaveLogToLocal)
 }

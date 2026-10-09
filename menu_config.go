@@ -11,23 +11,23 @@ import (
 
 func (a *App) addCleanHistoryMenuCmd() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`清空历史记录`菜单"}
-	if global_clear_state == Normal {
+	if a.clearState == Normal {
 		menu := systray.AddMenuItem("清空历史记录", "【清空历史记录】会将历史记录清空，但是不会清空剪贴板中的内容")
 		menu.Click(func() {
-			global_clear_state = ReadyToClear
+			a.clearState = ReadyToClear
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "准备清空历史记录，等待确认..."}
 		})
 	} else {
 		menu := systray.AddMenuItem("确认/取消清空历史记录？", "")
 		menuOk := menu.AddSubMenuItem("确认清空？", "")
 		menuOk.Click(func() {
-			global_clear_state = Normal
+			a.clearState = Normal
 			a.history.Clear()
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "历史记录已清空"}
 		})
 		menuCancel := menu.AddSubMenuItem("取消清空?", "")
 		menuCancel.Click(func() {
-			global_clear_state = Normal
+			a.clearState = Normal
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "取消清空历史记录"}
 		})
 	}
@@ -37,15 +37,15 @@ func (a *App) addConfigMenuAction() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`配置`菜单"}
 
 	menu := systray.AddMenuItem("配置", "")
-	menu.AddSubMenuItemCheckbox("单独删除项", "", config_single_delete).Click(func() {
-		config_single_delete = !config_single_delete
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", config_single_delete)}
+	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete).Click(func() {
+		a.configSingleDelete = !a.configSingleDelete
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete)}
 	})
-	menu.AddSubMenuItemCheckbox("自动识别颜色", "", config_auto_recognize_color).Click(func() {
-		config_auto_recognize_color = !config_auto_recognize_color
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", config_auto_recognize_color)}
+	menu.AddSubMenuItemCheckbox("自动识别颜色", "", a.configAutoRecognizeColor).Click(func() {
+		a.configAutoRecognizeColor = !a.configAutoRecognizeColor
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor)}
 	})
-	menu.AddSubMenuItem("设置最大历史记录条数"+fmt.Sprintf("(当前: %d)", config_history_max), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
+	menu.AddSubMenuItem("设置最大历史记录条数"+fmt.Sprintf("(当前: %d)", a.configHistoryMax), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置最大历史记录条数"}
 		top := a.history.GetTop()
 		if top == nil || top.Type != TypeText {
@@ -64,8 +64,8 @@ func (a *App) addConfigMenuAction() {
 			return
 		}
 
-		config_history_max = uint(digit)
-		a.history.SetMaxSize(config_history_max)
+		a.configHistoryMax = uint(digit)
+		a.history.SetMaxSize(a.configHistoryMax)
 	})
 
 	shareMenu := menu.AddSubMenuItem("局域网共享", "")
@@ -161,20 +161,21 @@ func (a *App) addConfigMenuAction() {
 		}
 	}
 
-	transLateMenu := menu.AddSubMenuItemCheckbox("翻译", "", global_translator != nil)
+	transLateMenu := menu.AddSubMenuItemCheckbox("翻译", "", a.currentTranslator() != nil)
 	{
-		langMenu := transLateMenu.AddSubMenuItem("翻译为："+string(global_translate_to_lang), "")
+		langMenu := transLateMenu.AddSubMenuItem("翻译为："+string(a.currentTranslateToLang()), "")
 		{
+			currentLang := a.currentTranslateToLang()
 			for _, lang := range translator.TransLangFactory() {
-				langMenu.AddSubMenuItemCheckbox(string(lang), "", global_translate_to_lang == lang).Click(func() {
-					global_translate_to_lang = lang
+				langMenu.AddSubMenuItemCheckbox(string(lang), "", currentLang == lang).Click(func() {
+					a.setTranslateToLang(lang)
 				})
 			}
 		}
 		for _, translatorImp := range translator.TranslatorFactory() {
-			transLateMenu.AddSubMenuItemCheckbox(translatorImp.Name(), "", global_translator == translatorImp).Click(func() {
-				if global_translator == translatorImp && translatorImp.IsEnabled() {
-					global_translator = nil
+			transLateMenu.AddSubMenuItemCheckbox(translatorImp.Name(), "", a.currentTranslator() == translatorImp).Click(func() {
+				if a.currentTranslator() == translatorImp && translatorImp.IsEnabled() {
+					a.setTranslator(nil)
 					return
 				}
 
@@ -183,7 +184,7 @@ func (a *App) addConfigMenuAction() {
 					return
 				}
 				if translatorImp.IsEnabled() || translatorImp.Enable(string(top.Content)) {
-					global_translator = translatorImp
+					a.setTranslator(translatorImp)
 				}
 			})
 		}
@@ -192,19 +193,19 @@ func (a *App) addConfigMenuAction() {
 	menu.AddSubMenuItem("打开配置文件目录", "").Click(func() {
 		openDir(getAppDataDir())
 	})
-	menu.AddSubMenuItemCheckbox("退出时保存日志", "", config_save_log_to_local).Click(func() {
-		config_save_log_to_local = !config_save_log_to_local
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", config_save_log_to_local)}
+	menu.AddSubMenuItemCheckbox("退出时保存日志", "", a.configSaveLogToLocal).Click(func() {
+		a.configSaveLogToLocal = !a.configSaveLogToLocal
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", a.configSaveLogToLocal)}
 	})
 }
 
 func (a *App) addSearchMenuAction() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`搜索`菜单"}
-	systray.AddMenuItemCheckbox("🔎 搜索"+Ifel(global_search_enable, ":"+global_search_text, ""), "【搜索】会使用剪贴板内的内容进行过滤，再次点击取消搜索", global_search_enable).Click(func() {
-		global_search_enable = !global_search_enable
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: Ifel(global_search_enable, "启用搜索", "禁用搜索")}
-		if !global_search_enable {
-			global_search_text = ""
+	systray.AddMenuItemCheckbox("🔎 搜索"+Ifel(a.searchEnable, ":"+a.searchText, ""), "【搜索】会使用剪贴板内的内容进行过滤，再次点击取消搜索", a.searchEnable).Click(func() {
+		a.searchEnable = !a.searchEnable
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: Ifel(a.searchEnable, "启用搜索", "禁用搜索")}
+		if !a.searchEnable {
+			a.searchText = ""
 			return
 		}
 
@@ -218,7 +219,7 @@ func (a *App) addSearchMenuAction() {
 			return
 		}
 
-		global_search_text = text
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索关键词: %s", global_search_text)}
+		a.searchText = text
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索关键词: %s", a.searchText)}
 	})
 }

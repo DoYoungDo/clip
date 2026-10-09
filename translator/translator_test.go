@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBaiduTranslateReturnsErrorWhenAPIRejectsRequest(t *testing.T) {
@@ -49,6 +50,36 @@ func TestBaiduTranslateReturnsErrorWhenResultIsEmpty(t *testing.T) {
 	_, err := b.Translate("hello", ZH)
 	if err == nil {
 		t.Fatalf("百度接口未返回翻译结果时应返回错误")
+	}
+}
+
+func TestTranslateReturnsErrorWhenServerTimesOut(t *testing.T) {
+	originalClient := httpClient
+	httpClient = &http.Client{Timeout: 50 * time.Millisecond}
+	defer func() { httpClient = originalClient }()
+
+	originalEndpoint := baiduTranslateEndpoint
+	defer func() { baiduTranslateEndpoint = originalEndpoint }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"from":"auto","to":"zh","trans_result":[{"src":"hello","dst":"你好"}]}`))
+	}))
+	defer server.Close()
+
+	baiduTranslateEndpoint = server.URL
+	b := NewBaiduTranslator()
+	b.appid = "appid"
+	b.key = "key"
+
+	start := time.Now()
+	_, err := b.Translate("hello", ZH)
+	if err == nil {
+		t.Fatalf("服务端响应超时时应返回错误")
+	}
+	if elapsed := time.Since(start); elapsed > 400*time.Millisecond {
+		t.Fatalf("应受客户端超时限制，实际耗时 %v", elapsed)
 	}
 }
 

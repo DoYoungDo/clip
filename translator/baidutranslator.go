@@ -96,7 +96,7 @@ func (b *BaiduTranslator) Translate(text string, lang TransLang) (string, error)
 	p.Set("salt", fmt.Sprintf("%v", salt))
 	p.Set("sign", fmt.Sprintf("%v", sign))
 
-	resp, err := http.Get(fmt.Sprintf("%s?%v", baiduTranslateEndpoint, p.Encode()))
+	resp, err := httpClient.Get(fmt.Sprintf("%s?%v", baiduTranslateEndpoint, p.Encode()))
 	if err != nil {
 		return "", err
 	}

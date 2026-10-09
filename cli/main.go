@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	commandergo "github.com/DoYoungDo/commander-go"
 	"golang.design/x/clipboard"
@@ -12,6 +13,18 @@ import (
 var (
 	app_version = "0.0.1"
 )
+
+func readClipboardText(r io.Reader) (string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+
+	text := string(data)
+	text = strings.TrimSuffix(text, "\n")
+	text = strings.TrimSuffix(text, "\r")
+	return text, nil
+}
 
 func main() {
 	app := commandergo.New("cli").
@@ -33,13 +46,10 @@ func main() {
 			return err
 		}
 
-		data, err := io.ReadAll(os.Stdin)
+		text, err := readClipboardText(os.Stdin)
 		if err != nil {
 			return err
 		}
-		text := string(data)
-		text = text[:len(text)-1]
-		// fmt.Print(text)
 		clipboard.Write(clipboard.FmtText, []byte(text))
 		return nil
 	})

@@ -50,7 +50,7 @@ func (a *App) addGroupMenuAction() bool {
 		groupIndex := i
 		groupMenu := systray.AddMenuItemCheckbox("📂"+groupName, "", group.Active)
 
-		if global_show_menu_state == RClick {
+		if a.showMenuState == RClick {
 			btnActive := groupMenu.AddSubMenuItemCheckbox("激活/取消激活分组", "", group.Active)
 			btnRename := groupMenu.AddSubMenuItem("重命名", "")
 			btnDelete := groupMenu.AddSubMenuItem("删除分组", "")
@@ -102,13 +102,13 @@ func (a *App) addGroupMenuAction() bool {
 		}
 
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("添加分组菜单: %s 历史记录", group.Name)}
-		for itemIndex, item := range group.History.GetAll() {
-			if global_search_enable && !strings.Contains(string(item.Content), global_search_text) {
+		for _, item := range group.History.GetAll() {
+			if a.searchEnable && !strings.Contains(string(item.Content), a.searchText) {
 				continue
 			}
 
 			entryMenu := groupMenu.AddSubMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
-			switch global_show_menu_state {
+			switch a.showMenuState {
 			case Click:
 				if !a.addColorRecognizeMenuAction(entryMenu, item) {
 					entryMenu.Click(func() {
@@ -118,15 +118,15 @@ func (a *App) addGroupMenuAction() bool {
 				}
 			case RClick:
 				if a.addColorRecognizeMenuAction(entryMenu, item) {
-					if config_single_delete {
+					if a.configSingleDelete {
 						del := entryMenu.AddSubMenuItem("删除", "")
 						del.Click(func() {
 							global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("删除分组历史记录项: %s", formatMenuItem(item))}
-							group.History.Delete(itemIndex)
+							group.History.Delete(item)
 						})
 					}
 				} else {
-					if config_single_delete {
+					if a.configSingleDelete {
 						copy := entryMenu.AddSubMenuItem("复制", "")
 						del := entryMenu.AddSubMenuItem("删除", "")
 						copy.Click(func() {
@@ -135,7 +135,7 @@ func (a *App) addGroupMenuAction() bool {
 						})
 						del.Click(func() {
 							global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("删除分组历史记录项: %s", formatMenuItem(item))}
-							group.History.Delete(itemIndex)
+							group.History.Delete(item)
 						})
 					} else {
 						entryMenu.Click(func() {

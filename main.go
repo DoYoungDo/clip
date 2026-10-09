@@ -15,7 +15,7 @@ func main() {
 	monitor, err := startMonitor()
 	if err != nil {
 		app.saveLocalState()
-		logger.FlushToFile(config_save_log_to_local)
+		logger.FlushToFile(app.configSaveLogToLocal)
 		return
 	}
 	app.monitor = monitor
