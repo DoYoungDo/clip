@@ -145,3 +145,41 @@ func TestAppTranslatorStateConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestHandleClipboardItemKeepLatestOnly(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.configKeepLatestOnly = true
+	group := NewGroup("g", true, 10)
+	app.groups["g"] = group
+
+	app.handleClipboardItem(NewClipItem(TypeText, []byte("same")))
+	app.handleClipboardItem(NewClipItem(TypeText, []byte("other")))
+	app.handleClipboardItem(NewClipItem(TypeText, []byte("same")))
+
+	all := app.history.GetAll()
+	if len(all) != 2 {
+		t.Fatalf("开启去重后主历史期望 2 条，实际 %d", len(all))
+	}
+	if string(all[0].Content) != "same" || string(all[1].Content) != "other" {
+		t.Fatalf("相同内容应只保留最近一条: got [%s, %s]", string(all[0].Content), string(all[1].Content))
+	}
+
+	groupAll := group.History.GetAll()
+	if len(groupAll) != 2 {
+		t.Fatalf("开启去重后分组历史期望 2 条，实际 %d", len(groupAll))
+	}
+}
+
+func TestHandleClipboardItemKeepsDuplicatesByDefault(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+
+	app.handleClipboardItem(NewClipItem(TypeText, []byte("same")))
+	app.handleClipboardItem(NewClipItem(TypeText, []byte("other")))
+	app.handleClipboardItem(NewClipItem(TypeText, []byte("same")))
+
+	if got := len(app.history.GetAll()); got != 3 {
+		t.Fatalf("默认不应去重，期望 3 条，实际 %d", got)
+	}
+}

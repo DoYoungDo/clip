@@ -111,22 +111,79 @@ func NewHistory(maxSize uint) *History {
 }
 
 func (h *History) Add(item *ClipItem) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	return h.add(item, false)
+}
 
-	if len(h.items) > 0 {
+// AddKeepLatest 添加项并移除历史中相同内容（类型 + Hash）的旧项，保证相同内容只保留最近一条。
+func (h *History) AddKeepLatest(item *ClipItem) bool {
+	return h.add(item, true)
+}
+
+func (h *History) add(item *ClipItem, keepLatest bool) bool {
+	if item == nil {
+		return false
+	}
+
+	h.mu.Lock()
+	if !keepLatest && len(h.items) > 0 {
 		top := h.items[0]
 		if top != nil && top.Type == item.Type && top.Hash == item.Hash {
+			h.mu.Unlock()
 			return false
 		}
 	}
 
 	// 允许重复，直接添加到最前面
+	removed := 0
+	if keepLatest {
+		filtered := make([]*ClipItem, 0, len(h.items))
+		for _, existing := range h.items {
+			if existing == nil {
+				continue
+			}
+			if existing.Type == item.Type && existing.Hash == item.Hash {
+				removed++
+				continue
+			}
+			filtered = append(filtered, existing)
+		}
+		h.items = filtered
+	}
+
 	h.items = append([]*ClipItem{item}, h.items...)
-	if (uint)(len(h.items)) > h.maxSize {
+	if uint(len(h.items)) > h.maxSize {
 		h.items = h.items[:h.maxSize]
 	}
+	h.mu.Unlock()
+
+	if removed > 0 {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已移除 %d 条相同内容的旧历史记录", removed)}
+	}
 	return true
+}
+
+// RemoveDuplicates 对当前历史做一次相同内容去重，每条内容只保留最新的那条。
+func (h *History) RemoveDuplicates() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	seen := make(map[string]bool, len(h.items))
+	filtered := make([]*ClipItem, 0, len(h.items))
+	for _, item := range h.items {
+		if item == nil {
+			continue
+		}
+		key := fmt.Sprintf("%d:%s", item.Type, item.Hash)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		filtered = append(filtered, item)
+	}
+
+	removed := len(h.items) - len(filtered)
+	h.items = filtered
+	return removed
 }
 
 func (h *History) GetAll() []*ClipItem {

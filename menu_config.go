@@ -67,6 +67,19 @@ func (a *App) addConfigMenuAction() {
 		a.configHistoryMax = uint(digit)
 		a.history.SetMaxSize(a.configHistoryMax)
 	})
+	menu.AddSubMenuItemCheckbox("相同内容只保留最新", "开启后相同内容的剪贴板记录只保留最近一条", a.configKeepLatestOnly).Click(func() {
+		a.configKeepLatestOnly = !a.configKeepLatestOnly
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置相同内容只保留最新: %v", a.configKeepLatestOnly)}
+		if a.configKeepLatestOnly {
+			removed := a.history.RemoveDuplicates()
+			a.groupsMu.RLock()
+			for _, group := range a.groups {
+				removed += group.History.RemoveDuplicates()
+			}
+			a.groupsMu.RUnlock()
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("相同内容只保留最新已开启，清理了 %d 条重复记录", removed)}
+		}
+	})
 
 	shareMenu := menu.AddSubMenuItem("局域网共享", "")
 	{

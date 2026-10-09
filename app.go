@@ -32,6 +32,7 @@ type App struct {
 	translateSeq    uint64
 
 	configHistoryMax         uint
+	configKeepLatestOnly     bool
 	configSingleDelete       bool
 	configAutoRecognizeColor bool
 	configSaveLogToLocal     bool
@@ -129,6 +130,7 @@ func (a *App) loadLocalState() {
 	}
 
 	a.configHistoryMax = localConfig.HistoryMax
+	a.configKeepLatestOnly = localConfig.KeepLatestOnly
 	a.configSingleDelete = localConfig.SingleDelete
 	a.configAutoRecognizeColor = localConfig.AutoRecognizeColor
 	a.configSaveLogToLocal = localConfig.SaveLogToLocal
@@ -189,6 +191,7 @@ func (a *App) saveLocalState() {
 
 	config := NewDefaultConfig()
 	config.HistoryMax = a.configHistoryMax
+	config.KeepLatestOnly = a.configKeepLatestOnly
 	config.SingleDelete = a.configSingleDelete
 	config.AutoRecognizeColor = a.configAutoRecognizeColor
 	config.SaveLogToLocal = a.configSaveLogToLocal
@@ -246,7 +249,12 @@ func (a *App) handleClipboardItem(item *ClipItem) {
 		return
 	}
 
-	succ := a.history.Add(item)
+	var succ bool
+	if a.configKeepLatestOnly {
+		succ = a.history.AddKeepLatest(item)
+	} else {
+		succ = a.history.Add(item)
+	}
 	if succ {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("新剪贴板内容: %s", formatMenuItem(item))}
 
@@ -266,7 +274,11 @@ func (a *App) handleClipboardItem(item *ClipItem) {
 
 	for _, group := range activeGroups {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("添加到分组 %s", group.Name)}
-		group.History.Add(item.Clone())
+		if a.configKeepLatestOnly {
+			group.History.AddKeepLatest(item.Clone())
+		} else {
+			group.History.Add(item.Clone())
+		}
 	}
 
 	a.shareServerMu.RLock()

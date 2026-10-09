@@ -32,6 +32,7 @@ type TranslatorData struct {
 
 type Config struct {
 	HistoryMax         uint            `json:"history_max"`
+	KeepLatestOnly     bool            `json:"keep_latest_only"`
 	SingleDelete       bool            `json:"single_delete"`
 	AutoRecognizeColor bool            `json:"auto_recognize_color"`
 	SaveLogToLocal     bool            `json:"save_log_to_local"`
@@ -42,6 +43,7 @@ type Config struct {
 func NewDefaultConfig() *Config {
 	return &Config{
 		HistoryMax:         50,
+		KeepLatestOnly:     false,
 		SingleDelete:       false,
 		AutoRecognizeColor: false,
 		SaveLogToLocal:     false,
