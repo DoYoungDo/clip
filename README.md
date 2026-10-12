@@ -115,4 +115,4 @@
 
 ## 系统要求
 
-macOS 10.12+ / Windows 10+ / Linux (X11/Wayland)
+macOS 10.13+ / Windows 10+ / Linux (X11/Wayland)
