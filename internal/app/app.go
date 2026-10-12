@@ -39,6 +39,7 @@ type App struct {
 
 	searchEnable  bool
 	searchText    string
+	searchLabel   string
 	showMenuState ShowMenuState
 	clearState    ClearState
 }

@@ -212,27 +212,47 @@ func (a *App) addConfigMenuAction() {
 	})
 }
 
-func (a *App) addSearchMenuAction() {
-	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`搜索`菜单"}
-	systray.AddMenuItemCheckbox("🔎 搜索"+Ifel(a.searchEnable, ":"+a.searchText, ""), "【搜索】会使用剪贴板内的内容进行过滤，再次点击取消搜索", a.searchEnable).Click(func() {
-		a.searchEnable = !a.searchEnable
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: Ifel(a.searchEnable, "启用搜索", "禁用搜索")}
-		if !a.searchEnable {
-			a.searchText = ""
-			return
-		}
+func (a *App) toggleSearch() {
+	if a.searchEnable {
+		a.searchEnable = false
+		a.searchText = ""
+		a.searchLabel = ""
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "禁用搜索"}
+		return
+	}
 
-		top := a.history.GetTop()
-		if top == nil {
-			return
-		}
+	top := a.history.GetTop()
+	if top == nil {
+		global_log_channel <- LogEntry{Kind: KindError, Content: "搜索失败: 历史记录为空"}
+		return
+	}
 
+	switch top.Type {
+	case TypeText:
 		text := string(top.Content)
 		if text == "" {
+			global_log_channel <- LogEntry{Kind: KindError, Content: "搜索失败: 最新的历史记录不是有效的文本"}
 			return
 		}
-
 		a.searchText = text
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索关键词: %s", a.searchText)}
+		a.searchLabel = truncateString(text, 16)
+	case TypeImage:
+		a.searchText = top.Hash
+		prefix := top.Hash
+		if len(prefix) > 8 {
+			prefix = prefix[:8]
+		}
+		a.searchLabel = fmt.Sprintf("图片 [%s]", prefix)
+	}
+
+	a.searchEnable = true
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "启用搜索"}
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索关键词: %s", a.searchLabel)}
+}
+
+func (a *App) addSearchMenuAction() {
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`搜索`菜单"}
+	systray.AddMenuItemCheckbox("🔎 搜索"+Ifel(a.searchEnable, ":"+a.searchLabel, ""), "【搜索】使用剪贴板内容过滤历史（图片按相同图片匹配），再次点击取消搜索", a.searchEnable).Click(func() {
+		a.toggleSearch()
 	})
 }

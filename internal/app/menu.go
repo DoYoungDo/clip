@@ -119,11 +119,21 @@ func (a *App) addColorRecognizeMenuAction(menu *systray.MenuItem, item *ClipItem
 	return true
 }
 
+func (a *App) matchSearch(item *ClipItem) bool {
+	if !a.searchEnable {
+		return true
+	}
+	if item.Type == TypeImage {
+		return strings.Contains(item.Hash, a.searchText)
+	}
+	return strings.Contains(string(item.Content), a.searchText)
+}
+
 func (a *App) addHistoryMenuAction() bool {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加历史记录项"}
 	all := a.history.GetAll()
 	for _, item := range all {
-		if a.searchEnable && !strings.Contains(string(item.Content), a.searchText) {
+		if !a.matchSearch(item) {
 			continue
 		}
 

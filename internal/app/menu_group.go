@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/energye/systray"
 )
@@ -103,7 +102,7 @@ func (a *App) addGroupMenuAction() bool {
 
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("添加分组菜单: %s 历史记录", group.Name)}
 		for _, item := range group.History.GetAll() {
-			if a.searchEnable && !strings.Contains(string(item.Content), a.searchText) {
+			if !a.matchSearch(item) {
 				continue
 			}
 
