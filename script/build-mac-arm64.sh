@@ -10,11 +10,12 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_NAME="clip"
 VERSION="${VERSION:-1.0.0}"
 BUILD_DIR="$ROOT_DIR/build"
+APP_VERSION="$(git -C "$ROOT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)"
 
 mkdir -p "$BUILD_DIR"
 
 echo "编译 macOS ARM64..."
-#GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $BUILD_DIR/${APP_NAME}-darwin-arm64 ./cmd/clip
+#GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION" -o $BUILD_DIR/${APP_NAME}-darwin-arm64 ./cmd/clip
 
 (cd "$ROOT_DIR" && \
   CGO_ENABLED=1 \
@@ -23,7 +24,7 @@ echo "编译 macOS ARM64..."
   CGO_CFLAGS="-mmacosx-version-min=10.13 -O2" \
   CGO_LDFLAGS="-mmacosx-version-min=10.13" \
   go build \
-    -ldflags="-s -w" \
+    -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION" \
     -a \
     -o "$BUILD_DIR/${APP_NAME}-darwin-arm64" ./cmd/clip)
 

@@ -10,11 +10,12 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_NAME="clip"
 VERSION="${VERSION:-1.0.0}"
 BUILD_DIR="$ROOT_DIR/build"
+APP_VERSION="$(git -C "$ROOT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)"
 
 mkdir -p "$BUILD_DIR"
 
 echo "编译 Linux ARM64..."
-(cd "$ROOT_DIR" && GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "$BUILD_DIR/${APP_NAME}-linux-arm64" ./cmd/clip)
+(cd "$ROOT_DIR" && GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION" -o "$BUILD_DIR/${APP_NAME}-linux-arm64" ./cmd/clip)
 
 # 创建 desktop 文件和图标
 if [ -f "$SCRIPT_DIR/icon.png" ]; then

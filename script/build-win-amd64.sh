@@ -10,6 +10,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_NAME="clip"
 VERSION="${VERSION:-1.0.0}"
 BUILD_DIR="$ROOT_DIR/build"
+APP_VERSION="$(git -C "$ROOT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)"
 
 mkdir -p "$BUILD_DIR"
 
@@ -30,13 +31,13 @@ if [ -f "$SCRIPT_DIR/icon.ico" ]; then
         # 生成 Windows 资源文件
         trap 'rm -f "$ROOT_DIR/rsrc.syso"' EXIT
         (cd "$ROOT_DIR" && rsrc -ico "$SCRIPT_DIR/icon.ico" -o rsrc.syso)
-        (cd "$ROOT_DIR" && GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-amd64.exe" ./cmd/clip)
+        (cd "$ROOT_DIR" && GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-amd64.exe" ./cmd/clip)
     else
         echo "警告: rsrc 工具安装失败，跳过图标嵌入"
-        (cd "$ROOT_DIR" && GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-amd64.exe" ./cmd/clip)
+        (cd "$ROOT_DIR" && GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-amd64.exe" ./cmd/clip)
     fi
 else
-    (cd "$ROOT_DIR" && GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-amd64.exe" ./cmd/clip)
+    (cd "$ROOT_DIR" && GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-amd64.exe" ./cmd/clip)
 fi
 
 echo "Windows AMD64 编译完成: $BUILD_DIR/${APP_NAME}-windows-amd64.exe"

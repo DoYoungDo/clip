@@ -55,6 +55,8 @@ func (a *App) onTrayRClick(menu systray.IMenu) {
 	addSeparator()
 	a.addConfigMenuAction()
 	addSeparator()
+	addAboutMenuCmd()
+	addSeparator()
 	addQuitMenuCmd()
 
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "显示菜单"}
@@ -86,6 +88,26 @@ func addQuitMenuCmd() {
 	mQuit := systray.AddMenuItem("退出", "退出程序")
 	mQuit.Click(func() {
 		systray.Quit()
+	})
+}
+
+func addAboutMenuCmd() {
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`关于`菜单"}
+	menu := systray.AddMenuItem("关于", "")
+	menu.AddSubMenuItem("名称: "+appName, "")
+	menu.AddSubMenuItem("版本: "+currentVersion(), "")
+	menu.AddSubMenuItem("协议: "+appLicense, "")
+	menu.AddSubMenuItem("作者: "+appAuthor, "").Click(func() {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "打开作者主页: " + appAuthorURL}
+		if err := openURL(appAuthorURL); err != nil {
+			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("打开作者主页失败: %v", err)}
+		}
+	})
+	menu.AddSubMenuItem("源码仓库", "").Click(func() {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "打开源码仓库: " + appRepoURL}
+		if err := openURL(appRepoURL); err != nil {
+			global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("打开源码仓库失败: %v", err)}
+		}
 	})
 }
 

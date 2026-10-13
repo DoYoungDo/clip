@@ -269,3 +269,18 @@ func TestMatchSearch(t *testing.T) {
 		t.Fatalf("文本关键词不应匹配图片")
 	}
 }
+
+func TestCurrentVersionFallback(t *testing.T) {
+	original := version
+	defer func() { version = original }()
+
+	version = ""
+	if got := currentVersion(); got != "dev" {
+		t.Fatalf("空版本应回退为 dev，got %q", got)
+	}
+
+	version = "v1.2.3"
+	if got := currentVersion(); got != "v1.2.3" {
+		t.Fatalf("应返回注入的版本，got %q", got)
+	}
+}
