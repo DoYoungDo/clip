@@ -149,7 +149,7 @@ func TestAppTranslatorStateConcurrentAccess(t *testing.T) {
 func TestHandleClipboardItemKeepLatestOnly(t *testing.T) {
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())
-	app.configKeepLatestOnly = true
+	app.configKeepLatestOnly.Store(true)
 	group := NewGroup("g", true, 10)
 	app.groups["g"] = group
 
@@ -282,5 +282,134 @@ func TestCurrentVersionFallback(t *testing.T) {
 	version = "v1.2.3"
 	if got := currentVersion(); got != "v1.2.3" {
 		t.Fatalf("应返回注入的版本，got %q", got)
+	}
+}
+
+func TestAddItemToHistoryKeepLatestOnly(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.configKeepLatestOnly.Store(true)
+
+	app.addItemToHistory(app.history, NewClipItem(TypeText, []byte("dup")))
+	app.addItemToHistory(app.history, NewClipItem(TypeText, []byte("other")))
+	app.addItemToHistory(app.history, NewClipItem(TypeText, []byte("dup")))
+
+	all := app.history.GetAll()
+	if len(all) != 2 {
+		t.Fatalf("相同内容应只保留一条，实际 %d", len(all))
+	}
+	if string(all[0].Content) != "dup" || string(all[1].Content) != "other" {
+		t.Fatalf("最新重复项应置顶: [%s, %s]", string(all[0].Content), string(all[1].Content))
+	}
+}
+
+func TestFlushMenuTitleUsesKeepLatestOnly(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.configKeepLatestOnly.Store(true)
+	app.writer = make(chan *ClipItem, 1)
+
+	app.addItemToHistory(app.history, NewClipItem(TypeText, []byte("dup")))
+
+	app.translateMu.Lock()
+	app.menuTitle = "dup"
+	app.translateMu.Unlock()
+	app.flushMenuTitle()
+
+	all := app.history.GetAll()
+	if len(all) != 1 {
+		t.Fatalf("翻译回写应走去重，期望 1 条，实际 %d", len(all))
+	}
+	if string(all[0].Content) != "dup" {
+		t.Fatalf("翻译回写内容错误: %s", string(all[0].Content))
+	}
+
+	select {
+	case item := <-app.writer:
+		if string(item.Content) != "dup" {
+			t.Fatalf("写回剪贴板内容错误: %s", string(item.Content))
+		}
+	default:
+		t.Fatalf("翻译回写应写入剪贴板")
+	}
+}
+
+func TestConfigKeepLatestOnlyConcurrentAccess(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				app.configKeepLatestOnly.Store(j%2 == 0)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				app.addItemToHistory(app.history, NewClipItem(TypeText, []byte("x")))
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestRenameGroupKeepsOrderAndHistory(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	group := NewGroup("old", true, 10)
+	group.History.Add(NewClipItem(TypeText, []byte("item")))
+	app.groups["old"] = group
+	app.groupNames = []string{"a", "old", "b"}
+
+	if !app.renameGroup("old", "new") {
+		t.Fatalf("重命名应成功")
+	}
+	if _, ok := app.groups["old"]; ok {
+		t.Fatalf("旧分组名应被移除")
+	}
+	renamed, ok := app.groups["new"]
+	if !ok || renamed.Name != "new" || renamed != group {
+		t.Fatalf("新分组应指向同一对象且 Name 更新")
+	}
+	if got := renamed.History.GetTop(); got == nil || string(got.Content) != "item" {
+		t.Fatalf("重命名后历史应保留")
+	}
+
+	want := []string{"a", "new", "b"}
+	if len(app.groupNames) != len(want) {
+		t.Fatalf("分组名数量错误: %v", app.groupNames)
+	}
+	for i := range want {
+		if app.groupNames[i] != want[i] {
+			t.Fatalf("分组名顺序错误: %v", app.groupNames)
+		}
+	}
+}
+
+func TestDeleteGroupRemovesOnlyTarget(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.groups["a"] = NewGroup("a", false, 10)
+	app.groups["b"] = NewGroup("b", false, 10)
+	app.groupNames = []string{"a", "b"}
+
+	if !app.deleteGroup("a") {
+		t.Fatalf("删除已存在分组应成功")
+	}
+	if _, ok := app.groups["a"]; ok {
+		t.Fatalf("目标分组应被删除")
+	}
+	if _, ok := app.groups["b"]; !ok {
+		t.Fatalf("其它分组不应受影响")
+	}
+	if len(app.groupNames) != 1 || app.groupNames[0] != "b" {
+		t.Fatalf("分组名列表错误: %v", app.groupNames)
+	}
+	if app.deleteGroup("missing") {
+		t.Fatalf("删除不存在分组应返回 false")
 	}
 }

@@ -36,12 +36,6 @@ func Ifel[T any](ok bool, a T, b T) T {
 	}
 	return b
 }
-func IfelFunc[T any](ok bool, a func() T, b func() T) T {
-	if ok {
-		return a()
-	}
-	return b()
-}
 
 func getConfigPath() string {
 	return filepath.Join(getAppDataDir(), "config.json")
@@ -62,14 +56,10 @@ func getLogPath() string {
 	return filepath.Join(getAppDataDir(), "clip.log")
 }
 
-func getColor(str string) (r string, g string, b string, base int, ok bool) {
-	pattern := `(?i)^(?:#(?:([\da-f][\da-f])([\da-f][\da-f])([\da-f][\da-f])|([\da-f])([\da-f])([\da-f]))|\(?(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})(?:\s*,\s*(?:\d|1?\d{2}|2[0-5]{2}))?\)?)$`
-	reg, err := regexp.Compile(pattern)
-	if err != nil {
-		return "", "", "", 0, false
-	}
+var colorPattern = regexp.MustCompile(`(?i)^(?:#(?:([\da-f][\da-f])([\da-f][\da-f])([\da-f][\da-f])|([\da-f])([\da-f])([\da-f]))|\(?(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})\s*,\s*(\d|1?\d{2}|2[0-5]{2})(?:\s*,\s*(?:\d|1?\d{2}|2[0-5]{2}))?\)?)$`)
 
-	groups := reg.FindStringSubmatch(str)
+func getColor(str string) (r string, g string, b string, base int, ok bool) {
+	groups := colorPattern.FindStringSubmatch(str)
 	if len(groups) < 9 {
 		return "", "", "", 0, false
 	}
@@ -81,6 +71,14 @@ func getColor(str string) (r string, g string, b string, base int, ok bool) {
 
 	return r, g, b, Ifel(groups[1] != "", 16, 10), ok
 }
+func startDetached(cmd *exec.Cmd) error {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
 func openDir(path string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
@@ -91,7 +89,7 @@ func openDir(path string) error {
 	default: // linux
 		cmd = exec.Command("xdg-open", path)
 	}
-	return cmd.Start()
+	return startDetached(cmd)
 }
 
 func openURL(url string) error {
@@ -104,5 +102,5 @@ func openURL(url string) error {
 	default: // linux
 		cmd = exec.Command("xdg-open", url)
 	}
-	return cmd.Start()
+	return startDetached(cmd)
 }

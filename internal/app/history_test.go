@@ -343,3 +343,22 @@ func BenchmarkCalcClipItemHashImage(b *testing.B) {
 		_ = calcClipItemHash(TypeImage, data)
 	}
 }
+
+func TestHistorySetMaxSizeTruncatesAndLogs(t *testing.T) {
+	resetTestLogChannel()
+	history := NewHistory(10)
+	for i := 0; i < 5; i++ {
+		history.Add(NewClipItem(TypeText, []byte(fmt.Sprintf("item-%d", i))))
+	}
+
+	history.SetMaxSize(2)
+	if got := len(history.GetAll()); got != 2 {
+		t.Fatalf("期望截断为 2 条，实际 %d", got)
+	}
+
+	select {
+	case <-global_log_channel:
+	default:
+		t.Fatalf("截断时应记录日志")
+	}
+}

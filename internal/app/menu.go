@@ -72,7 +72,7 @@ func (a *App) flushMenuTitle() {
 	translatedItem := NewClipItem(TypeText, []byte(title))
 	a.echoGuard.Mark(translatedItem, 3*time.Second)
 
-	a.history.Add(translatedItem)
+	a.addItemToHistory(a.history, translatedItem)
 	a.writer <- translatedItem
 
 	systray.SetTitle("")

@@ -203,7 +203,11 @@ func saveConfigToPath(path string, config *Config) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 func loadMergedConfig() (*Config, string, error) {

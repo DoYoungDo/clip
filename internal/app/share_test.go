@@ -129,3 +129,25 @@ func TestShareClientConnectToReceivesSharedItem(t *testing.T) {
 
 	<-serverDone
 }
+
+func TestShareServerDropsSlowClient(t *testing.T) {
+	resetTestLogChannel()
+	original := shareWriteTimeout
+	shareWriteTimeout = 50 * time.Millisecond
+	defer func() { shareWriteTimeout = original }()
+
+	serverConn, clientConn := net.Pipe()
+	defer clientConn.Close()
+
+	server := &ShareServer{conns: map[net.Conn]bool{serverConn: true}}
+	defer serverConn.Close()
+
+	start := time.Now()
+	server.Share(NewClipItem(TypeText, []byte("hello")))
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("慢客户端应被写超时快速断开，实际耗时 %v", elapsed)
+	}
+	if len(server.conns) != 0 {
+		t.Fatalf("慢客户端应从连接池移除，实际剩余 %d", len(server.conns))
+	}
+}

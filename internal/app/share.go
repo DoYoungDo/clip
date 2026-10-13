@@ -8,7 +8,11 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
+
+// shareWriteTimeout 是向单个客户端发送共享内容的写超时，超时后断开该客户端。
+var shareWriteTimeout = 3 * time.Second
 
 type ShareServer struct {
 	ln         net.Listener
@@ -102,26 +106,36 @@ func (s *ShareServer) Share(item *ClipItem) {
 		return
 	}
 
+	// 使用长度前缀协议：4字节长度 + JSON数据，合并为单次写入。
+	payload := make([]byte, 4+len(data))
+	binary.BigEndian.PutUint32(payload[:4], uint32(len(data)))
+	copy(payload[4:], data)
+
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("发送剪贴板内容，长度为%d字节", len(data))}
+
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// 使用长度前缀协议：4字节长度 + JSON数据
-	length := uint32(len(data))
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, length)
-
-	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("发送剪贴板内容，长度为%d字节", length)}
+	conns := make([]net.Conn, 0, len(s.conns))
 	for conn := range s.conns {
-		if _, err := conn.Write(header); err != nil {
+		conns = append(conns, conn)
+	}
+	s.mu.Unlock()
+
+	for _, conn := range conns {
+		if err := writeSharePayload(conn, payload); err != nil {
 			conn.Close()
+			s.mu.Lock()
 			delete(s.conns, conn)
-			continue
-		}
-		if _, err := conn.Write(data); err != nil {
-			conn.Close()
-			delete(s.conns, conn)
+			s.mu.Unlock()
 		}
 	}
+}
+
+func writeSharePayload(conn net.Conn, payload []byte) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(shareWriteTimeout)); err != nil {
+		return err
+	}
+	_, err := conn.Write(payload)
+	return err
 }
 
 type ShareClient struct {

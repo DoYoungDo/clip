@@ -96,13 +96,9 @@ func NewClipItem(itemType ItemType, content []byte) *ClipItem {
 }
 
 func NewClipItemFromRemote(itemType ItemType, content []byte) *ClipItem {
-	return &ClipItem{
-		Type:    itemType,
-		Content: append([]byte{}, content...),
-		Hash:    calcClipItemHash(itemType, content),
-		Time:    time.Now(),
-		From:    FromRemote,
-	}
+	item := newClipItemWithHash(itemType, content, calcClipItemHash(itemType, content))
+	item.From = FromRemote
+	return item
 }
 
 func (c *ClipItem) CloneToRemote() *ClipItem {
@@ -268,13 +264,15 @@ func (h *History) Delete(item *ClipItem) bool {
 
 func (h *History) SetMaxSize(max uint) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	h.maxSize = max
-
-	if max < (uint)(len(h.items)) {
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("历史记录超过新设置的最大值%d，正在删除多余的记录...", max)}
+	truncated := max < uint(len(h.items))
+	if truncated {
 		h.items = h.items[:max]
+	}
+	h.mu.Unlock()
+
+	if truncated {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("历史记录超过新设置的最大值%d，正在删除多余的记录...", max)}
 	}
 }
 

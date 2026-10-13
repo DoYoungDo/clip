@@ -18,7 +18,7 @@ func (a *App) addCreateGroupMenuCmd() {
 		}
 		if top.Type != TypeText {
 			global_log_channel <- LogEntry{Kind: KindError, Content: "创建分组失败: 最新的历史记录不是文本，无法作为分组名"}
-			fmt.Println("不支持创建图片分组")
+			global_log_channel <- LogEntry{Kind: KindError, Content: "不支持创建图片分组"}
 			return
 		}
 
@@ -30,6 +30,44 @@ func (a *App) addCreateGroupMenuCmd() {
 	})
 }
 
+func (a *App) renameGroup(oldName string, newName string) bool {
+	a.groupsMu.Lock()
+	defer a.groupsMu.Unlock()
+
+	group, ok := a.groups[oldName]
+	if !ok {
+		return false
+	}
+	group.Name = newName
+	a.groups[newName] = group
+	delete(a.groups, oldName)
+	for i, existing := range a.groupNames {
+		if existing == oldName {
+			a.groupNames[i] = newName
+			break
+		}
+	}
+	return true
+}
+
+func (a *App) deleteGroup(name string) bool {
+	a.groupsMu.Lock()
+	defer a.groupsMu.Unlock()
+
+	if _, ok := a.groups[name]; !ok {
+		return false
+	}
+	delete(a.groups, name)
+	filtered := a.groupNames[:0]
+	for _, existing := range a.groupNames {
+		if existing != name {
+			filtered = append(filtered, existing)
+		}
+	}
+	a.groupNames = filtered
+	return true
+}
+
 func (a *App) addGroupMenuAction() bool {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加分组项"}
 
@@ -37,7 +75,7 @@ func (a *App) addGroupMenuAction() bool {
 	namesSnapshot := append([]string(nil), a.groupNames...)
 	a.groupsMu.RUnlock()
 
-	for i, name := range namesSnapshot {
+	for _, name := range namesSnapshot {
 		a.groupsMu.RLock()
 		group := a.groups[name]
 		a.groupsMu.RUnlock()
@@ -46,7 +84,6 @@ func (a *App) addGroupMenuAction() bool {
 		}
 
 		groupName := name
-		groupIndex := i
 		groupMenu := systray.AddMenuItemCheckbox("📂"+groupName, "", group.Active)
 
 		if a.showMenuState == RClick {
@@ -74,29 +111,17 @@ func (a *App) addGroupMenuAction() bool {
 				}
 				if top.Type != TypeText {
 					global_log_channel <- LogEntry{Kind: KindError, Content: "重命名分组失败: 最新的历史记录不是文本，无法作为新分组名"}
-					fmt.Println("不支持重命名图片分组")
+					global_log_channel <- LogEntry{Kind: KindError, Content: "不支持重命名图片分组"}
 					return
 				}
 
 				newName := string(top.Content)
-				a.groupsMu.Lock()
-				group.Name = newName
-				a.groups[newName] = group
-				delete(a.groups, groupName)
-				if groupIndex >= 0 && groupIndex < len(a.groupNames) {
-					a.groupNames[groupIndex] = newName
-				}
-				a.groupsMu.Unlock()
+				a.renameGroup(groupName, newName)
 			})
 
 			btnDelete.Click(func() {
 				global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("删除分组: %s", group.Name)}
-				a.groupsMu.Lock()
-				delete(a.groups, groupName)
-				if groupIndex >= 0 && groupIndex < len(a.groupNames) {
-					a.groupNames = append(a.groupNames[:groupIndex], a.groupNames[groupIndex+1:]...)
-				}
-				a.groupsMu.Unlock()
+				a.deleteGroup(groupName)
 			})
 		}
 

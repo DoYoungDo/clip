@@ -3,7 +3,9 @@ package app
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -202,5 +204,21 @@ func TestLoadMergedConfigMergesCurrentAndLegacy(t *testing.T) {
 	}
 	if len(merged.Data.GroupNames) != 2 {
 		t.Fatalf("分组名应合并为 2 个，实际 %d", len(merged.Data.GroupNames))
+	}
+}
+
+func TestStartDetachedReturnsErrorForMissingCommand(t *testing.T) {
+	err := startDetached(exec.Command("/definitely/not/exist/clip-test"))
+	if err == nil {
+		t.Fatalf("不存在的命令应返回错误")
+	}
+}
+
+func TestStartDetachedRunsCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows 下跳过")
+	}
+	if err := startDetached(exec.Command("true")); err != nil {
+		t.Fatalf("启动命令失败: %v", err)
 	}
 }

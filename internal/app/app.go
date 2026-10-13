@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"clip/internal/translator"
 	"github.com/energye/systray"
@@ -32,7 +33,7 @@ type App struct {
 	translateSeq    uint64
 
 	configHistoryMax         uint
-	configKeepLatestOnly     bool
+	configKeepLatestOnly     atomic.Bool
 	configSingleDelete       bool
 	configAutoRecognizeColor bool
 	configSaveLogToLocal     bool
@@ -55,6 +56,14 @@ func NewApp(logger *AppLogger) *App {
 	}
 	app.history = NewHistory(app.configHistoryMax)
 	return app
+}
+
+// addItemToHistory 按当前配置写入历史：开启"相同内容只保留最新"时先移除旧的同内容项。
+func (a *App) addItemToHistory(h *History, item *ClipItem) bool {
+	if a.configKeepLatestOnly.Load() {
+		return h.AddKeepLatest(item)
+	}
+	return h.Add(item)
 }
 
 func (a *App) currentTranslator() translator.Translator {
@@ -131,7 +140,7 @@ func (a *App) loadLocalState() {
 	}
 
 	a.configHistoryMax = localConfig.HistoryMax
-	a.configKeepLatestOnly = localConfig.KeepLatestOnly
+	a.configKeepLatestOnly.Store(localConfig.KeepLatestOnly)
 	a.configSingleDelete = localConfig.SingleDelete
 	a.configAutoRecognizeColor = localConfig.AutoRecognizeColor
 	a.configSaveLogToLocal = localConfig.SaveLogToLocal
@@ -192,7 +201,7 @@ func (a *App) saveLocalState() {
 
 	config := NewDefaultConfig()
 	config.HistoryMax = a.configHistoryMax
-	config.KeepLatestOnly = a.configKeepLatestOnly
+	config.KeepLatestOnly = a.configKeepLatestOnly.Load()
 	config.SingleDelete = a.configSingleDelete
 	config.AutoRecognizeColor = a.configAutoRecognizeColor
 	config.SaveLogToLocal = a.configSaveLogToLocal
@@ -250,12 +259,7 @@ func (a *App) handleClipboardItem(item *ClipItem) {
 		return
 	}
 
-	var succ bool
-	if a.configKeepLatestOnly {
-		succ = a.history.AddKeepLatest(item)
-	} else {
-		succ = a.history.Add(item)
-	}
+	succ := a.addItemToHistory(a.history, item)
 	if succ {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("新剪贴板内容: %s", formatMenuItem(item))}
 
@@ -275,11 +279,7 @@ func (a *App) handleClipboardItem(item *ClipItem) {
 
 	for _, group := range activeGroups {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("添加到分组 %s", group.Name)}
-		if a.configKeepLatestOnly {
-			group.History.AddKeepLatest(item.Clone())
-		} else {
-			group.History.Add(item.Clone())
-		}
+		a.addItemToHistory(group.History, item.Clone())
 	}
 
 	a.shareServerMu.RLock()
