@@ -1,6 +1,9 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -411,5 +414,148 @@ func TestDeleteGroupRemovesOnlyTarget(t *testing.T) {
 	}
 	if app.deleteGroup("missing") {
 		t.Fatalf("删除不存在分组应返回 false")
+	}
+}
+
+func TestRenameImageItemUsesTopText(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	image := NewClipItem(TypeImage, []byte("image"))
+	app.history.Add(image)
+	app.history.Add(NewClipItem(TypeText, []byte("我的截图")))
+
+	app.renameImageItem(app.history, image)
+
+	var renamed *ClipItem
+	for _, item := range app.history.GetAll() {
+		if item.Type == TypeImage {
+			renamed = item
+		}
+	}
+	if renamed == nil || renamed.Name != "我的截图" {
+		t.Fatalf("图片应以顶部文本重命名: %#v", renamed)
+	}
+	if renamed.Hash != image.Hash {
+		t.Fatalf("重命名不应改变内容哈希")
+	}
+}
+
+func TestRenameImageItemSkipsImageTop(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	target := NewClipItem(TypeImage, []byte("target"))
+	app.history.Add(target)
+	app.history.Add(NewClipItem(TypeImage, []byte("top-image")))
+
+	app.renameImageItem(app.history, target)
+	for _, item := range app.history.GetAll() {
+		if item.Name != "" {
+			t.Fatalf("顶部为图片时不应重命名: %#v", item)
+		}
+	}
+}
+
+func TestRenameImageItemRejectsEmptyHistory(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.renameImageItem(app.history, NewClipItem(TypeImage, []byte("target")))
+}
+
+func TestFormatMenuItemShowsImageName(t *testing.T) {
+	item := NewClipItem(TypeImage, []byte("image"))
+	plain := formatMenuItem(item)
+	if !strings.Contains(plain, "图片 [") {
+		t.Fatalf("未命名图片应显示默认标签: %s", plain)
+	}
+
+	item.Name = "截图"
+	named := formatMenuItem(item)
+	if !strings.Contains(named, "截图") {
+		t.Fatalf("命名图片应显示名称: %s", named)
+	}
+	if got := formatMenuItemTooltip(item); got != "截图" {
+		t.Fatalf("tooltip 应显示名称，got %q", got)
+	}
+}
+
+func TestRenameImageItemLimitsNameLength(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	image := NewClipItem(TypeImage, []byte("image"))
+	app.history.Add(image)
+
+	longText := strings.Repeat("名", maxImageNameRunes+20)
+	app.history.Add(NewClipItem(TypeText, []byte(longText)))
+
+	app.renameImageItem(app.history, image)
+
+	var renamed *ClipItem
+	for _, item := range app.history.GetAll() {
+		if item.Type == TypeImage {
+			renamed = item
+		}
+	}
+	if renamed == nil {
+		t.Fatalf("图片项应存在")
+	}
+	want := strings.Repeat("名", maxImageNameRunes)
+	if renamed.Name != want {
+		t.Fatalf("名称应截断为 %d 个字符: got %q", maxImageNameRunes, renamed.Name)
+	}
+}
+
+func TestAddItemToHistoryInheritsImageName(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	older := NewClipItem(TypeImage, []byte("same-image"))
+	app.history.Add(older)
+	app.history.Rename(older, "截图")
+
+	app.addItemToHistory(app.history, NewClipItem(TypeImage, []byte("same-image")))
+	for _, item := range app.history.GetAll() {
+		if item.Name != "截图" {
+			t.Fatalf("图片新项应继承名称: %#v", item)
+		}
+	}
+
+	app.configKeepLatestOnly.Store(true)
+	app.addItemToHistory(app.history, NewClipItem(TypeImage, []byte("same-image")))
+	all := app.history.GetAll()
+	if len(all) != 1 || all[0].Name != "截图" {
+		t.Fatalf("去重后应保留继承的名称: %#v", all)
+	}
+}
+
+func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
+	tempDir := t.TempDir()
+	legacyDir := filepath.Join(tempDir, "legacy")
+	if err := os.MkdirAll(legacyDir, 0755); err != nil {
+		t.Fatalf("创建目录失败: %v", err)
+	}
+
+	t.Setenv("HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempDir, "xdg"))
+	legacyConfigPathOverride = filepath.Join(legacyDir, "config.json")
+	defer func() { legacyConfigPathOverride = "" }()
+
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	image := NewClipItem(TypeImage, []byte("image"))
+	app.history.Add(image)
+	app.history.Add(NewClipItem(TypeText, []byte("我的截图")))
+	app.renameImageItem(app.history, image)
+	app.saveLocalState()
+
+	reloaded := NewApp(NewAppLogger())
+	reloaded.loadLocalState()
+
+	var found *ClipItem
+	for _, item := range reloaded.history.GetAll() {
+		if item.Type == TypeImage {
+			found = item
+		}
+	}
+	if found == nil || found.Name != "我的截图" {
+		t.Fatalf("重启后图片名称应持久化: %#v", found)
 	}
 }

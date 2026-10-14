@@ -147,24 +147,11 @@ func (a *App) addGroupMenuAction() bool {
 							group.History.Delete(item)
 						})
 					}
-				} else {
-					if a.configSingleDelete {
-						copy := entryMenu.AddSubMenuItem("复制", "")
-						del := entryMenu.AddSubMenuItem("删除", "")
-						copy.Click(func() {
-							global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制分组历史记录项: %s", formatMenuItem(item))}
-							a.writer <- item
-						})
-						del.Click(func() {
-							global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("删除分组历史记录项: %s", formatMenuItem(item))}
-							group.History.Delete(item)
-						})
-					} else {
-						entryMenu.Click(func() {
-							global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制分组历史记录项: %s", formatMenuItem(item))}
-							a.writer <- item
-						})
-					}
+				} else if !a.addItemSubMenu(entryMenu, item, group.History, "分组历史记录项") {
+					entryMenu.Click(func() {
+						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制分组历史记录项: %s", formatMenuItem(item))}
+						a.writer <- item
+					})
 				}
 			}
 		}

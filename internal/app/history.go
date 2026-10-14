@@ -30,6 +30,7 @@ type ClipItem struct {
 	Type    ItemType  `json:"type"`
 	Content []byte    `json:"content"`
 	Hash    string    `json:"hash"`
+	Name    string    `json:"name,omitempty"`
 	Time    time.Time `json:"time"`
 	From    ItemFrom  `json:"from"`
 }
@@ -106,6 +107,7 @@ func (c *ClipItem) CloneToRemote() *ClipItem {
 		Type:    c.Type,
 		Content: append([]byte{}, c.Content...),
 		Hash:    c.Hash,
+		Name:    c.Name,
 		Time:    c.Time,
 		From:    FromRemote,
 	}
@@ -116,6 +118,7 @@ func (c *ClipItem) Clone() *ClipItem {
 		Type:    c.Type,
 		Content: append([]byte{}, c.Content...),
 		Hash:    c.Hash,
+		Name:    c.Name,
 		Time:    c.Time,
 		From:    c.From,
 	}
@@ -208,6 +211,43 @@ func (h *History) RemoveDuplicates() int {
 	removed := len(h.items) - len(filtered)
 	h.items = filtered
 	return removed
+}
+
+// Rename 用带新名称的克隆替换目标项（替换指针而非原地修改，避免并发读写 item 字段）。
+func (h *History) Rename(item *ClipItem, name string) bool {
+	if item == nil {
+		return false
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for i, existing := range h.items {
+		if existing == item {
+			renamed := item.Clone()
+			renamed.Name = name
+			h.items[i] = renamed
+			return true
+		}
+	}
+	return false
+}
+
+// NameByHash 返回历史中指定哈希图片项的自定义名称。
+func (h *History) NameByHash(hash string) string {
+	if hash == "" {
+		return ""
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for _, item := range h.items {
+		if item != nil && item.Type == TypeImage && item.Hash == hash && item.Name != "" {
+			return item.Name
+		}
+	}
+	return ""
 }
 
 func (h *History) GetAll() []*ClipItem {

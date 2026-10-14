@@ -362,3 +362,31 @@ func TestHistorySetMaxSizeTruncatesAndLogs(t *testing.T) {
 		t.Fatalf("截断时应记录日志")
 	}
 }
+
+func TestHistoryRenameReplacesItem(t *testing.T) {
+	resetTestLogChannel()
+	history := NewHistory(10)
+	item := NewClipItem(TypeImage, []byte("image"))
+	history.Add(item)
+
+	if !history.Rename(item, "截图") {
+		t.Fatalf("重命名应成功")
+	}
+
+	top := history.GetTop()
+	if top == item {
+		t.Fatalf("重命名应替换为新指针以避免并发读写")
+	}
+	if top.Name != "截图" {
+		t.Fatalf("名称未更新: %q", top.Name)
+	}
+	if top.Hash != item.Hash || string(top.Content) != "image" {
+		t.Fatalf("内容与哈希应保留")
+	}
+	if history.Rename(item, "again") {
+		t.Fatalf("对已被替换的旧指针操作应失败")
+	}
+	if history.Rename(nil, "x") {
+		t.Fatalf("nil 项应返回 false")
+	}
+}

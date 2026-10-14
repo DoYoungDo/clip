@@ -22,7 +22,11 @@ func formatMenuItem(item *ClipItem) string {
 		text = truncateString(text, 40)
 	case TypeImage:
 		prefix = "🖼️"
-		text = fmt.Sprintf("图片 [%s]", fmt.Sprintf("%x", md5.Sum(item.Content))[:8])
+		label := "图片"
+		if item.Name != "" {
+			label = truncateString(item.Name, 40)
+		}
+		text = fmt.Sprintf("%s [%s]", label, fmt.Sprintf("%x", md5.Sum(item.Content))[:8])
 	}
 
 	t := fmt.Sprintf("%s [%s]%s%s", prefix, item.Time.Format("15:04"), Ifel(item.From == FromRemote, " [R] ", ""), text)
@@ -38,6 +42,9 @@ func formatMenuItemTooltip(item *ClipItem) string {
 	case TypeText:
 		return string(item.Content)
 	case TypeImage:
+		if item.Name != "" {
+			return item.Name
+		}
 		return "图片"
 	default:
 		return ""

@@ -35,6 +35,7 @@ type App struct {
 	configHistoryMax         uint
 	configKeepLatestOnly     atomic.Bool
 	configSingleDelete       bool
+	configImageRename        bool
 	configAutoRecognizeColor bool
 	configSaveLogToLocal     bool
 
@@ -58,8 +59,14 @@ func NewApp(logger *AppLogger) *App {
 	return app
 }
 
-// addItemToHistory 按当前配置写入历史：开启"相同内容只保留最新"时先移除旧的同内容项。
+// addItemToHistory 按当前配置写入历史：开启"相同内容只保留最新"时先移除旧的同内容项；
+// 图片无名称时按哈希继承历史中已保存的名称（覆盖点击复制、局域网接收等路径）。
 func (a *App) addItemToHistory(h *History, item *ClipItem) bool {
+	if item != nil && item.Type == TypeImage && item.Name == "" {
+		if name := a.history.NameByHash(item.Hash); name != "" {
+			item.Name = name
+		}
+	}
 	if a.configKeepLatestOnly.Load() {
 		return h.AddKeepLatest(item)
 	}
@@ -142,6 +149,7 @@ func (a *App) loadLocalState() {
 	a.configHistoryMax = localConfig.HistoryMax
 	a.configKeepLatestOnly.Store(localConfig.KeepLatestOnly)
 	a.configSingleDelete = localConfig.SingleDelete
+	a.configImageRename = localConfig.ImageRename
 	a.configAutoRecognizeColor = localConfig.AutoRecognizeColor
 	a.configSaveLogToLocal = localConfig.SaveLogToLocal
 
@@ -203,6 +211,7 @@ func (a *App) saveLocalState() {
 	config.HistoryMax = a.configHistoryMax
 	config.KeepLatestOnly = a.configKeepLatestOnly.Load()
 	config.SingleDelete = a.configSingleDelete
+	config.ImageRename = a.configImageRename
 	config.AutoRecognizeColor = a.configAutoRecognizeColor
 	config.SaveLogToLocal = a.configSaveLogToLocal
 	config.Data.History = a.history.GetAll()

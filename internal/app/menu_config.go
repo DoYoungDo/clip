@@ -80,6 +80,10 @@ func (a *App) addConfigMenuAction() {
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("相同内容只保留最新已开启，清理了 %d 条重复记录", removed)}
 		}
 	})
+	menu.AddSubMenuItemCheckbox("图片重命名", "开启后可在右键菜单为图片命名，名称取自最新剪贴板文本", a.configImageRename).Click(func() {
+		a.configImageRename = !a.configImageRename
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置图片重命名: %v", a.configImageRename)}
+	})
 
 	shareMenu := menu.AddSubMenuItem("局域网共享", "")
 	{
