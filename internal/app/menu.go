@@ -162,9 +162,7 @@ func (a *App) addHistoryMenuAction() bool {
 		menu := systray.AddMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 		switch a.showMenuState {
 		case Click:
-			if !a.addColorRecognizeMenuAction(menu, item) {
-				menu.Click(func() { a.writer <- item })
-			}
+			menu.Click(func() { a.writer <- item })
 		case RClick:
 			if a.addColorRecognizeMenuAction(menu, item) {
 				if a.configSingleDelete {

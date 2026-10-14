@@ -134,12 +134,10 @@ func (a *App) addGroupMenuAction() bool {
 			entryMenu := groupMenu.AddSubMenuItem(formatMenuItem(item), formatMenuItemTooltip(item))
 			switch a.showMenuState {
 			case Click:
-				if !a.addColorRecognizeMenuAction(entryMenu, item) {
-					entryMenu.Click(func() {
-						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制分组历史记录项: %s", formatMenuItem(item))}
-						a.writer <- item
-					})
-				}
+				entryMenu.Click(func() {
+					global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制分组历史记录项: %s", formatMenuItem(item))}
+					a.writer <- item
+				})
 			case RClick:
 				if a.addColorRecognizeMenuAction(entryMenu, item) {
 					if a.configSingleDelete {
