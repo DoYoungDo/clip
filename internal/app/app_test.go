@@ -559,3 +559,37 @@ func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
 		t.Fatalf("重启后图片名称应持久化: %#v", found)
 	}
 }
+
+func TestHasItemSubMenu(t *testing.T) {
+	app := NewApp(NewAppLogger())
+	plainText := NewClipItem(TypeText, []byte("hello"))
+	colorText := NewClipItem(TypeText, []byte("#aabbcc"))
+	image := NewClipItem(TypeImage, []byte("img"))
+
+	if app.hasItemSubMenu(plainText) || app.hasItemSubMenu(image) {
+		t.Fatalf("默认配置下不应有子菜单")
+	}
+
+	app.configSingleDelete = true
+	if !app.hasItemSubMenu(plainText) {
+		t.Fatalf("开启单独删除后所有条目应有子菜单")
+	}
+	app.configSingleDelete = false
+
+	app.configAutoRecognizeColor = true
+	if !app.isColorRecognizable(colorText) || !app.hasItemSubMenu(colorText) {
+		t.Fatalf("颜色文本应有颜色识别子菜单")
+	}
+	if app.hasItemSubMenu(plainText) || app.hasItemSubMenu(image) {
+		t.Fatalf("非颜色文本与图片不应命中颜色识别")
+	}
+	app.configAutoRecognizeColor = false
+
+	app.configImageRename = true
+	if !app.hasItemSubMenu(image) {
+		t.Fatalf("开启图片重命名后图片应有子菜单")
+	}
+	if app.hasItemSubMenu(plainText) {
+		t.Fatalf("文本不应有重命名子菜单")
+	}
+}
