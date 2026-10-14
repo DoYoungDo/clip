@@ -111,38 +111,64 @@ func addAboutMenuCmd() {
 	})
 }
 
-// isColorRecognizable 判断文本项是否命中颜色识别。
-func (a *App) isColorRecognizable(item *ClipItem) bool {
-	if !a.configAutoRecognizeColor || item.Type != TypeText {
-		return false
-	}
-	_, _, _, _, ok := getColor(string(item.Content))
-	return ok
+// itemMenuInfo 是条目右键菜单的能力快照，单次解析避免重复计算。
+type itemMenuInfo struct {
+	canRename bool
+	hasColor  bool
+	hasDelete bool
+	hasSub    bool
+	colorHex  string
+	colorRGB  string
 }
 
-// addColorRecognizeMenuItems 为可识别颜色的文本项添加"复制Hex / 复制RGB"子菜单。
-func (a *App) addColorRecognizeMenuItems(menu *systray.MenuItem, item *ClipItem) {
-	r, g, b, base, ok := getColor(string(item.Content))
-	if !ok {
-		return
+// canRenameImage 判断条目是否可重命名（图片且开启图片重命名配置）。
+func (a *App) canRenameImage(item *ClipItem) bool {
+	return item.Type == TypeImage && a.configImageRename
+}
+
+// buildItemMenuInfo 一次性解析条目的右键菜单能力（颜色识别/重命名/删除）。
+func (a *App) buildItemMenuInfo(item *ClipItem) itemMenuInfo {
+	info := itemMenuInfo{
+		canRename: a.canRenameImage(item),
+		hasDelete: a.configSingleDelete,
 	}
 
+	if a.configAutoRecognizeColor && item.Type == TypeText {
+		if r, g, b, base, ok := getColor(string(item.Content)); ok {
+			info.hasColor = true
+			rt, _ := strconv.ParseInt(r, base, 0)
+			gt, _ := strconv.ParseInt(g, base, 0)
+			bt, _ := strconv.ParseInt(b, base, 0)
+			info.colorHex = fmt.Sprintf("#%x%x%x", rt, gt, bt)
+			info.colorRGB = fmt.Sprintf("%d,%d,%d", rt, gt, bt)
+		}
+	}
+
+	info.hasSub = info.canRename || info.hasColor || info.hasDelete
+	return info
+}
+
+// itemMenuTooltip 返回主菜单项的悬浮提示；右键将构建子菜单时置空，避免遮挡子菜单。
+func itemMenuTooltip(item *ClipItem, info itemMenuInfo) string {
+	if info.hasSub {
+		return ""
+	}
+	return formatMenuItemTooltip(item)
+}
+
+// addColorRecognizeMenuItems 添加"复制Hex / 复制RGB"子菜单（颜色值来自已解析的 info）。
+func (a *App) addColorRecognizeMenuItems(menu *systray.MenuItem, item *ClipItem, info itemMenuInfo) {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("识别颜色成功: %s,并添加菜单", string(item.Content))}
-	rt, _ := strconv.ParseInt(r, base, 0)
-	gt, _ := strconv.ParseInt(g, base, 0)
-	bt, _ := strconv.ParseInt(b, base, 0)
-	hexT := fmt.Sprintf("#%x%x%x", rt, gt, bt)
-	rgbT := fmt.Sprintf("%d,%d,%d", rt, gt, bt)
 
 	copyH := menu.AddSubMenuItem("复制Hex", "")
 	copyRGB := menu.AddSubMenuItem("复制RGB", "")
 	copyH.Click(func() {
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制Hex颜色: %s", hexT)}
-		a.writer <- NewClipItem(TypeText, []byte(hexT))
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制Hex颜色: %s", info.colorHex)}
+		a.writer <- NewClipItem(TypeText, []byte(info.colorHex))
 	})
 	copyRGB.Click(func() {
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制RGB颜色: %s", rgbT)}
-		a.writer <- NewClipItem(TypeText, []byte(rgbT))
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制RGB颜色: %s", info.colorRGB)}
+		a.writer <- NewClipItem(TypeText, []byte(info.colorRGB))
 	})
 }
 
@@ -162,35 +188,24 @@ func (a *App) addDeleteMenuItem(menu *systray.MenuItem, item *ClipItem, logPrefi
 	})
 }
 
-// hasItemSubMenu 判断右键时该条目是否会构建二级菜单（颜色识别/重命名/删除任一开启）。
-func (a *App) hasItemSubMenu(item *ClipItem) bool {
-	if a.configSingleDelete {
-		return true
-	}
-	if item.Type == TypeImage && a.configImageRename {
-		return true
-	}
-	return a.isColorRecognizable(item)
-}
-
 // addItemSubMenu 构建右键二级菜单，顺序为：复制（最高优先级，承载悬浮提示）→ 颜色识别 → 重命名 → 删除。
 // 返回是否添加了任何子菜单。
-func (a *App) addItemSubMenu(menu *systray.MenuItem, item *ClipItem, h *History, logPrefix string) bool {
-	if !a.hasItemSubMenu(item) {
+func (a *App) addItemSubMenu(menu *systray.MenuItem, item *ClipItem, h *History, logPrefix string, info itemMenuInfo) bool {
+	if !info.hasSub {
 		return false
 	}
 
 	a.addCopyMenuItem(menu, item, logPrefix, formatMenuItemTooltip(item))
-	if a.isColorRecognizable(item) {
-		a.addColorRecognizeMenuItems(menu, item)
+	if info.hasColor {
+		a.addColorRecognizeMenuItems(menu, item, info)
 	}
-	if item.Type == TypeImage && a.configImageRename {
+	if info.canRename {
 		rename := menu.AddSubMenuItem("重命名", "使用最新剪贴板内容作为新名称")
 		rename.Click(func() {
 			a.renameImageItem(h, item)
 		})
 	}
-	if a.configSingleDelete {
+	if info.hasDelete {
 		a.addDeleteMenuItem(menu, item, logPrefix, func() { h.Delete(item) })
 	}
 	return true
@@ -253,16 +268,16 @@ func (a *App) addHistoryMenuAction() bool {
 			continue
 		}
 
-		tooltip := formatMenuItemTooltip(item)
-		if a.showMenuState == RClick && a.hasItemSubMenu(item) {
-			tooltip = ""
+		var info itemMenuInfo
+		if a.showMenuState == RClick {
+			info = a.buildItemMenuInfo(item)
 		}
-		menu := systray.AddMenuItem(formatMenuItem(item), tooltip)
+		menu := systray.AddMenuItem(formatMenuItem(item), itemMenuTooltip(item, info))
 		switch a.showMenuState {
 		case Click:
 			menu.Click(func() { a.writer <- item })
 		case RClick:
-			if !a.addItemSubMenu(menu, item, a.history, "历史记录项") {
+			if !a.addItemSubMenu(menu, item, a.history, "历史记录项", info) {
 				menu.Click(func() { a.writer <- item })
 			}
 		}

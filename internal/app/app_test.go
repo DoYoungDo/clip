@@ -560,36 +560,39 @@ func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
 	}
 }
 
-func TestHasItemSubMenu(t *testing.T) {
+func TestBuildItemMenuInfo(t *testing.T) {
 	app := NewApp(NewAppLogger())
 	plainText := NewClipItem(TypeText, []byte("hello"))
 	colorText := NewClipItem(TypeText, []byte("#aabbcc"))
 	image := NewClipItem(TypeImage, []byte("img"))
 
-	if app.hasItemSubMenu(plainText) || app.hasItemSubMenu(image) {
+	if info := app.buildItemMenuInfo(plainText); info.hasSub {
 		t.Fatalf("默认配置下不应有子菜单")
 	}
 
 	app.configSingleDelete = true
-	if !app.hasItemSubMenu(plainText) {
+	if info := app.buildItemMenuInfo(plainText); !info.hasSub || !info.hasDelete {
 		t.Fatalf("开启单独删除后所有条目应有子菜单")
 	}
 	app.configSingleDelete = false
 
 	app.configAutoRecognizeColor = true
-	if !app.isColorRecognizable(colorText) || !app.hasItemSubMenu(colorText) {
-		t.Fatalf("颜色文本应有颜色识别子菜单")
+	if info := app.buildItemMenuInfo(colorText); !info.hasColor || !info.hasSub || info.colorHex != "#aabbcc" || info.colorRGB != "170,187,204" {
+		t.Fatalf("颜色文本应命中颜色识别: %+v", info)
 	}
-	if app.hasItemSubMenu(plainText) || app.hasItemSubMenu(image) {
-		t.Fatalf("非颜色文本与图片不应命中颜色识别")
+	if info := app.buildItemMenuInfo(plainText); info.hasColor || info.hasSub {
+		t.Fatalf("非颜色文本不应命中颜色识别")
+	}
+	if info := app.buildItemMenuInfo(image); info.hasColor {
+		t.Fatalf("图片不应命中颜色识别")
 	}
 	app.configAutoRecognizeColor = false
 
 	app.configImageRename = true
-	if !app.hasItemSubMenu(image) {
+	if info := app.buildItemMenuInfo(image); !info.canRename || !info.hasSub {
 		t.Fatalf("开启图片重命名后图片应有子菜单")
 	}
-	if app.hasItemSubMenu(plainText) {
+	if info := app.buildItemMenuInfo(plainText); info.canRename {
 		t.Fatalf("文本不应有重命名子菜单")
 	}
 }

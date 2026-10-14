@@ -131,11 +131,11 @@ func (a *App) addGroupMenuAction() bool {
 				continue
 			}
 
-			tooltip := formatMenuItemTooltip(item)
-			if a.showMenuState == RClick && a.hasItemSubMenu(item) {
-				tooltip = ""
+			var info itemMenuInfo
+			if a.showMenuState == RClick {
+				info = a.buildItemMenuInfo(item)
 			}
-			entryMenu := groupMenu.AddSubMenuItem(formatMenuItem(item), tooltip)
+			entryMenu := groupMenu.AddSubMenuItem(formatMenuItem(item), itemMenuTooltip(item, info))
 			switch a.showMenuState {
 			case Click:
 				entryMenu.Click(func() {
@@ -143,7 +143,7 @@ func (a *App) addGroupMenuAction() bool {
 					a.writer <- item
 				})
 			case RClick:
-				if !a.addItemSubMenu(entryMenu, item, group.History, "分组历史记录项") {
+				if !a.addItemSubMenu(entryMenu, item, group.History, "分组历史记录项", info) {
 					entryMenu.Click(func() {
 						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制分组历史记录项: %s", formatMenuItem(item))}
 						a.writer <- item
