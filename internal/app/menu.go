@@ -264,9 +264,9 @@ const searchHighlightMaxRunes = 16
 
 func (a *App) menuItemTitle(item *ClipItem) string {
 	if a.searchEnable && item.Type == TypeText && len([]rune(a.searchText)) <= searchHighlightMaxRunes {
-		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix, a.configHighlightSuffix))
+		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix, a.configHighlightSuffix), a.configTimeFormat)
 	}
-	return formatMenuItem(item)
+	return formatMenuItemWithText(item, itemDisplayText(item), a.configTimeFormat)
 }
 
 func (a *App) addHistoryMenuAction() bool {

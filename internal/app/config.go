@@ -39,6 +39,7 @@ type Config struct {
 	SaveLogToLocal     bool            `json:"save_log_to_local"`
 	HighlightPrefix    string          `json:"highlight_prefix"`
 	HighlightSuffix    string          `json:"highlight_suffix"`
+	TimeFormat         string          `json:"time_format"`
 	Data               HistoryData     `json:"data"`
 	Translator         *TranslatorData `json:"translator_data"`
 }
@@ -53,6 +54,7 @@ func NewDefaultConfig() *Config {
 		SaveLogToLocal:     false,
 		HighlightPrefix:    defaultHighlightPrefix,
 		HighlightSuffix:    defaultHighlightSuffix,
+		TimeFormat:         defaultTimeFormat,
 		Data: HistoryData{
 			History:    nil,
 			Groups:     make(map[string]HistoryGroupData),

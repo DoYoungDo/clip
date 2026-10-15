@@ -77,6 +77,22 @@ func (a *App) addConfigMenuAction() {
 		a.configHighlightSuffix = parts[1]
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索高亮标记: %s %s", a.configHighlightPrefix, a.configHighlightSuffix)}
 	})
+	menu.AddSubMenuItem("设置时间格式"+fmt.Sprintf("(当前: %s)", a.configTimeFormat), "【设置时间格式】复制时间格式后点击，支持 YYYY YY MM DD HH mm ss 任意组合，如 YYYY-MM-DD HH:mm:ss").Click(func() {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置时间格式"}
+		top := a.history.GetTop()
+		if top == nil || top.Type != TypeText {
+			return
+		}
+
+		format := strings.TrimSpace(string(top.Content))
+		if format == "" || strings.ContainsAny(format, "\n\r") {
+			global_log_channel <- LogEntry{Kind: KindError, Content: "设置时间格式失败: 请复制单行的时间格式，如 YYYY-MM-DD HH:mm:ss"}
+			return
+		}
+
+		a.configTimeFormat = format
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置时间格式: %s", a.configTimeFormat)}
+	})
 	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete).Click(func() {
 		a.configSingleDelete = !a.configSingleDelete
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete)}

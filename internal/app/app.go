@@ -41,6 +41,7 @@ type App struct {
 
 	configHighlightPrefix string
 	configHighlightSuffix string
+	configTimeFormat      string
 
 	searchEnable  bool
 	searchText    string
@@ -59,6 +60,7 @@ func NewApp(logger *AppLogger) *App {
 		configHistoryMax:      const_max_history,
 		configHighlightPrefix: defaultHighlightPrefix,
 		configHighlightSuffix: defaultHighlightSuffix,
+		configTimeFormat:      defaultTimeFormat,
 	}
 	app.history = NewHistory(app.configHistoryMax)
 	return app
@@ -163,6 +165,9 @@ func (a *App) loadLocalState() {
 	if localConfig.HighlightSuffix != "" {
 		a.configHighlightSuffix = localConfig.HighlightSuffix
 	}
+	if localConfig.TimeFormat != "" {
+		a.configTimeFormat = localConfig.TimeFormat
+	}
 
 	a.history.SetMaxSize(a.configHistoryMax)
 
@@ -227,6 +232,7 @@ func (a *App) saveLocalState() {
 	config.SaveLogToLocal = a.configSaveLogToLocal
 	config.HighlightPrefix = a.configHighlightPrefix
 	config.HighlightSuffix = a.configHighlightSuffix
+	config.TimeFormat = a.configTimeFormat
 	config.Data.History = a.history.GetAll()
 
 	a.groupsMu.RLock()

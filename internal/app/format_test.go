@@ -73,11 +73,37 @@ func TestHighlightTruncateFallsBackWhenKeywordEmpty(t *testing.T) {
 
 func TestFormatMenuItemWithHighlightedText(t *testing.T) {
 	item := NewClipItem(TypeText, []byte("我的密码是123"))
-	got := formatMenuItemWithText(item, highlightTruncate(string(item.Content), "密码", menuTextMaxRunes, defaultHighlightPrefix, defaultHighlightSuffix))
+	got := formatMenuItemWithText(item, highlightTruncate(string(item.Content), "密码", menuTextMaxRunes, defaultHighlightPrefix, defaultHighlightSuffix), defaultTimeFormat)
 	if !strings.Contains(got, "📝 [") {
 		t.Fatalf("条目标题应保留前缀与时间格式, got %s", got)
 	}
 	if !strings.Contains(got, "我的【密码】是123") {
 		t.Fatalf("条目标题应包含高亮文本, got %s", got)
+	}
+}
+
+func TestToGoTimeLayout(t *testing.T) {
+	cases := []struct {
+		generic  string
+		goLayout string
+	}{
+		{"hh:mm", "15:04"},
+		{"YYYY-MM-DD HH:mm:ss", "2006-01-02 15:04:05"},
+		{"YY/MM", "06/01"},
+		{"DD日HH:mm", "02日15:04"},
+		{"abc", "abc"},
+	}
+	for _, c := range cases {
+		if got := toGoTimeLayout(c.generic); got != c.goLayout {
+			t.Fatalf("通用格式转换错误: %s got %s, want %s", c.generic, got, c.goLayout)
+		}
+	}
+}
+
+func TestFormatMenuItemWithCustomTimeFormat(t *testing.T) {
+	item := NewClipItem(TypeText, []byte("文本"))
+	got := formatMenuItemWithText(item, itemDisplayText(item), "YYYY-MM-DD HH:mm:ss")
+	if !strings.Contains(got, "["+item.Time.Format("2006-01-02 15:04:05")+"]") {
+		t.Fatalf("条目标题应使用自定义时间格式, got %s", got)
 	}
 }

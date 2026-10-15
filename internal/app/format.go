@@ -18,8 +18,25 @@ const defaultHighlightSuffix = "】"
 
 const menuTextMaxRunes = 40
 
+const defaultTimeFormat = "hh:mm"
+
+var timeLayoutReplacer = strings.NewReplacer(
+	"YYYY", "2006",
+	"YY", "06",
+	"MM", "01",
+	"DD", "02",
+	"HH", "15",
+	"hh", "15",
+	"mm", "04",
+	"ss", "05",
+)
+
+func toGoTimeLayout(format string) string {
+	return timeLayoutReplacer.Replace(format)
+}
+
 func formatMenuItem(item *ClipItem) string {
-	return formatMenuItemWithText(item, itemDisplayText(item))
+	return formatMenuItemWithText(item, itemDisplayText(item), defaultTimeFormat)
 }
 
 func itemDisplayText(item *ClipItem) string {
@@ -36,7 +53,7 @@ func itemDisplayText(item *ClipItem) string {
 	return ""
 }
 
-func formatMenuItemWithText(item *ClipItem, text string) string {
+func formatMenuItemWithText(item *ClipItem, text string, timeFormat string) string {
 	var prefix string
 	switch item.Type {
 	case TypeText:
@@ -45,7 +62,7 @@ func formatMenuItemWithText(item *ClipItem, text string) string {
 		prefix = "🖼️"
 	}
 
-	t := fmt.Sprintf("%s [%s]%s%s", prefix, item.Time.Format("15:04"), Ifel(item.From == FromRemote, " [R] ", ""), text)
+	t := fmt.Sprintf("%s [%s]%s%s", prefix, item.Time.Format(toGoTimeLayout(timeFormat)), Ifel(item.From == FromRemote, " [R] ", ""), text)
 	if t == "" {
 		t = prefix + " [empty]"
 	}
