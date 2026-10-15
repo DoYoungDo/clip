@@ -75,6 +75,7 @@ func (a *App) addGroupMenuAction() bool {
 	namesSnapshot := append([]string(nil), a.groupNames...)
 	a.groupsMu.RUnlock()
 
+	addedGroups := 0
 	for _, name := range namesSnapshot {
 		a.groupsMu.RLock()
 		group := a.groups[name]
@@ -82,6 +83,17 @@ func (a *App) addGroupMenuAction() bool {
 		if group == nil {
 			continue
 		}
+
+		matched := make([]*ClipItem, 0)
+		for _, item := range group.History.GetAll() {
+			if a.matchSearch(item) {
+				matched = append(matched, item)
+			}
+		}
+		if a.searchEnable && len(matched) == 0 {
+			continue
+		}
+		addedGroups++
 
 		groupName := name
 		groupMenu := systray.AddMenuItemCheckbox("📂"+groupName, "", group.Active)
@@ -126,11 +138,7 @@ func (a *App) addGroupMenuAction() bool {
 		}
 
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("添加分组菜单: %s 历史记录", group.Name)}
-		for _, item := range group.History.GetAll() {
-			if !a.matchSearch(item) {
-				continue
-			}
-
+		for _, item := range matched {
 			var info itemMenuInfo
 			if a.showMenuState == RClick {
 				info = a.buildItemMenuInfo(item)
@@ -153,8 +161,5 @@ func (a *App) addGroupMenuAction() bool {
 		}
 	}
 
-	a.groupsMu.RLock()
-	count := len(a.groups)
-	a.groupsMu.RUnlock()
-	return count > 0
+	return addedGroups > 0
 }
