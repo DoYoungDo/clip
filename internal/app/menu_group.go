@@ -143,7 +143,7 @@ func (a *App) addGroupMenuAction() bool {
 			if a.showMenuState == RClick {
 				info = a.buildItemMenuInfo(item)
 			}
-			entryMenu := groupMenu.AddSubMenuItem(formatMenuItem(item), itemMenuTooltip(item, info))
+			entryMenu := groupMenu.AddSubMenuItem(a.menuItemTitle(item), itemMenuTooltip(item, info))
 			switch a.showMenuState {
 			case Click:
 				entryMenu.Click(func() {

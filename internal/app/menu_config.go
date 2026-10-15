@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"clip/internal/translator"
@@ -58,6 +59,23 @@ func (a *App) addConfigMenuAction() {
 
 		a.configHistoryMax = uint(digit)
 		a.history.SetMaxSize(a.configHistoryMax)
+	})
+	menu.AddSubMenuItem("设置搜索高亮标记"+fmt.Sprintf("(当前: %s%s)", a.configHighlightPrefix, a.configHighlightSuffix), "【设置搜索高亮标记】复制\"前缀 后缀\"两个标记（空格分隔）后点击，设置搜索命中内容在菜单中的包裹标记").Click(func() {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置搜索高亮标记"}
+		top := a.history.GetTop()
+		if top == nil || top.Type != TypeText {
+			return
+		}
+
+		parts := strings.Fields(string(top.Content))
+		if len(parts) != 2 {
+			global_log_channel <- LogEntry{Kind: KindError, Content: "设置搜索高亮标记失败: 请复制\"前缀 后缀\"格式，两个标记用空格分隔"}
+			return
+		}
+
+		a.configHighlightPrefix = parts[0]
+		a.configHighlightSuffix = parts[1]
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索高亮标记: %s %s", a.configHighlightPrefix, a.configHighlightSuffix)}
 	})
 	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete).Click(func() {
 		a.configSingleDelete = !a.configSingleDelete

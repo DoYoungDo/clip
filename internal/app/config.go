@@ -37,6 +37,8 @@ type Config struct {
 	ImageRename        bool            `json:"image_rename"`
 	AutoRecognizeColor bool            `json:"auto_recognize_color"`
 	SaveLogToLocal     bool            `json:"save_log_to_local"`
+	HighlightPrefix    string          `json:"highlight_prefix"`
+	HighlightSuffix    string          `json:"highlight_suffix"`
 	Data               HistoryData     `json:"data"`
 	Translator         *TranslatorData `json:"translator_data"`
 }
@@ -49,6 +51,8 @@ func NewDefaultConfig() *Config {
 		ImageRename:        false,
 		AutoRecognizeColor: false,
 		SaveLogToLocal:     false,
+		HighlightPrefix:    defaultHighlightPrefix,
+		HighlightSuffix:    defaultHighlightSuffix,
 		Data: HistoryData{
 			History:    nil,
 			Groups:     make(map[string]HistoryGroupData),

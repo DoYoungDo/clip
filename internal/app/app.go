@@ -39,6 +39,9 @@ type App struct {
 	configAutoRecognizeColor bool
 	configSaveLogToLocal     bool
 
+	configHighlightPrefix string
+	configHighlightSuffix string
+
 	searchEnable  bool
 	searchText    string
 	searchLabel   string
@@ -48,12 +51,14 @@ type App struct {
 
 func NewApp(logger *AppLogger) *App {
 	app := &App{
-		logger:           logger,
-		groups:           make(map[string]*Group),
-		groupNames:       []string{},
-		echoGuard:        &echoSuppressor{},
-		shareClients:     make(map[string]*ShareClient),
-		configHistoryMax: const_max_history,
+		logger:                logger,
+		groups:                make(map[string]*Group),
+		groupNames:            []string{},
+		echoGuard:             &echoSuppressor{},
+		shareClients:          make(map[string]*ShareClient),
+		configHistoryMax:      const_max_history,
+		configHighlightPrefix: defaultHighlightPrefix,
+		configHighlightSuffix: defaultHighlightSuffix,
 	}
 	app.history = NewHistory(app.configHistoryMax)
 	return app
@@ -152,6 +157,12 @@ func (a *App) loadLocalState() {
 	a.configImageRename = localConfig.ImageRename
 	a.configAutoRecognizeColor = localConfig.AutoRecognizeColor
 	a.configSaveLogToLocal = localConfig.SaveLogToLocal
+	if localConfig.HighlightPrefix != "" {
+		a.configHighlightPrefix = localConfig.HighlightPrefix
+	}
+	if localConfig.HighlightSuffix != "" {
+		a.configHighlightSuffix = localConfig.HighlightSuffix
+	}
 
 	a.history.SetMaxSize(a.configHistoryMax)
 
@@ -214,6 +225,8 @@ func (a *App) saveLocalState() {
 	config.ImageRename = a.configImageRename
 	config.AutoRecognizeColor = a.configAutoRecognizeColor
 	config.SaveLogToLocal = a.configSaveLogToLocal
+	config.HighlightPrefix = a.configHighlightPrefix
+	config.HighlightSuffix = a.configHighlightSuffix
 	config.Data.History = a.history.GetAll()
 
 	a.groupsMu.RLock()

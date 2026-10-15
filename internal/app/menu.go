@@ -260,6 +260,15 @@ func (a *App) matchSearch(item *ClipItem) bool {
 	return strings.Contains(string(item.Content), a.searchText)
 }
 
+const searchHighlightMaxRunes = 16
+
+func (a *App) menuItemTitle(item *ClipItem) string {
+	if a.searchEnable && item.Type == TypeText && len([]rune(a.searchText)) <= searchHighlightMaxRunes {
+		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix, a.configHighlightSuffix))
+	}
+	return formatMenuItem(item)
+}
+
 func (a *App) addHistoryMenuAction() bool {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加历史记录项"}
 	all := a.history.GetAll()
@@ -272,7 +281,7 @@ func (a *App) addHistoryMenuAction() bool {
 		if a.showMenuState == RClick {
 			info = a.buildItemMenuInfo(item)
 		}
-		menu := systray.AddMenuItem(formatMenuItem(item), itemMenuTooltip(item, info))
+		menu := systray.AddMenuItem(a.menuItemTitle(item), itemMenuTooltip(item, info))
 		switch a.showMenuState {
 		case Click:
 			menu.Click(func() { a.writer <- item })
