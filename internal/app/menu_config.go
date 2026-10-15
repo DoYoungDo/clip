@@ -190,7 +190,11 @@ func (a *App) addConfigMenuAction() {
 			}
 		}
 		for _, translatorImp := range translator.TranslatorFactory() {
-			transLateMenu.AddSubMenuItemCheckbox(translatorImp.Name(), "", a.currentTranslator() == translatorImp).Click(func() {
+			translatorName := translatorImp.Name()
+			if translatorImp.IsEnabled() {
+				translatorName = fmt.Sprintf("%v（已配置密钥）", translatorName)
+			}
+			transLateMenu.AddSubMenuItemCheckbox(translatorName, "", a.currentTranslator() == translatorImp).Click(func() {
 				if a.currentTranslator() == translatorImp && translatorImp.IsEnabled() {
 					a.setTranslator(nil)
 					return
