@@ -63,6 +63,13 @@ func (y *YouDaoTranslator) IsEnabled() bool {
 	return y.isEnabled
 }
 
+// Disable implements [Translator].
+func (y *YouDaoTranslator) Disable() {
+	y.appkey = ""
+	y.secret = ""
+	y.isEnabled = false
+}
+
 // Name implements [Translator].
 func (y *YouDaoTranslator) Name() string {
 	name := "有道翻译"

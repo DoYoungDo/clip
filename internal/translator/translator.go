@@ -20,6 +20,7 @@ type Translator interface {
 	Name() string
 	Translate(text string, lang TransLang) (string, error)
 	Enable(secret string) bool
+	Disable()
 	IsEnabled() bool
 	Secret() string
 }

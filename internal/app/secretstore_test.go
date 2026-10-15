@@ -30,6 +30,11 @@ func (f *fakeTranslator) Enable(secret string) bool {
 
 func (f *fakeTranslator) IsEnabled() bool { return f.enabled }
 
+func (f *fakeTranslator) Disable() {
+	f.enabled = false
+	f.secret = ""
+}
+
 func (f *fakeTranslator) Secret() string { return f.secret }
 
 type memorySecretStore struct {

@@ -46,6 +46,13 @@ func (b *BaiduTranslator) IsEnabled() bool {
 	return b.isEnabled
 }
 
+// Disable implements [Translator].
+func (b *BaiduTranslator) Disable() {
+	b.appid = ""
+	b.key = ""
+	b.isEnabled = false
+}
+
 // Enable implements [Translator].
 func (b *BaiduTranslator) Enable(secret string) bool {
 	lines := strings.Split(secret, " ")

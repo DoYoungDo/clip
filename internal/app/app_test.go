@@ -24,6 +24,7 @@ func (s *stubTranslator) Translate(text string, lang translator.TransLang) (stri
 }
 
 func (s *stubTranslator) Enable(secret string) bool { return true }
+func (s *stubTranslator) Disable()                  {}
 func (s *stubTranslator) IsEnabled() bool           { return true }
 func (s *stubTranslator) Secret() string            { return "" }
 

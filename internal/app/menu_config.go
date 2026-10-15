@@ -189,6 +189,30 @@ func (a *App) addConfigMenuAction() {
 				})
 			}
 		}
+		{
+			enabledTranslators := make([]translator.Translator, 0)
+			for _, translatorImp := range translator.TranslatorFactory() {
+				if translatorImp.IsEnabled() {
+					enabledTranslators = append(enabledTranslators, translatorImp)
+				}
+			}
+			if len(enabledTranslators) > 0 {
+				deleteSecretMenu := transLateMenu.AddSubMenuItem("删除密钥", "")
+				for _, translatorImp := range enabledTranslators {
+					deleteSecretMenu.AddSubMenuItem(translatorImp.Name(), fmt.Sprintf("【删除密钥】会删除 %s 保存在系统钥匙串中的密钥，删除后需重新配置", translatorImp.Name())).Click(func() {
+						if err := translatorSecretStore.Delete(translatorImp.Id()); err != nil {
+							global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("删除翻译器 %s 的密钥失败: %v", translatorImp.Name(), err)}
+							return
+						}
+						if a.currentTranslator() == translatorImp {
+							a.setTranslator(nil)
+						}
+						translatorImp.Disable()
+						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已删除翻译器 %s 的密钥", translatorImp.Name())}
+					})
+				}
+			}
+		}
 		for _, translatorImp := range translator.TranslatorFactory() {
 			translatorName := translatorImp.Name()
 			if translatorImp.IsEnabled() {

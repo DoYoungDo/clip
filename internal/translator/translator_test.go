@@ -105,3 +105,35 @@ func TestYoudaoTranslateReturnsErrorOnHTTPFailure(t *testing.T) {
 		t.Fatalf("错误信息应包含 HTTP 状态码，got %v", err)
 	}
 }
+
+func TestDisableResetsTranslatorState(t *testing.T) {
+	b := NewBaiduTranslator()
+	b.appid = "appid"
+	b.key = "key"
+	b.isEnabled = true
+	b.Disable()
+	if b.IsEnabled() {
+		t.Fatalf("百度翻译 Disable 后应处于未启用状态")
+	}
+	if b.Secret() != "" {
+		t.Fatalf("百度翻译 Disable 后不应再返回密钥")
+	}
+	if b.appid != "" || b.key != "" {
+		t.Fatalf("百度翻译 Disable 后应清空密钥字段")
+	}
+
+	y := NewYouDaoTranslator()
+	y.appkey = "appkey"
+	y.secret = "secret"
+	y.isEnabled = true
+	y.Disable()
+	if y.IsEnabled() {
+		t.Fatalf("有道翻译 Disable 后应处于未启用状态")
+	}
+	if y.Secret() != "" {
+		t.Fatalf("有道翻译 Disable 后不应再返回密钥")
+	}
+	if y.appkey != "" || y.secret != "" {
+		t.Fatalf("有道翻译 Disable 后应清空密钥字段")
+	}
+}
