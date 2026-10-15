@@ -37,15 +37,7 @@ func (a *App) addConfigMenuAction() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`配置`菜单"}
 
 	menu := systray.AddMenuItem("配置", "")
-	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete).Click(func() {
-		a.configSingleDelete = !a.configSingleDelete
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete)}
-	})
-	menu.AddSubMenuItemCheckbox("自动识别颜色", "", a.configAutoRecognizeColor).Click(func() {
-		a.configAutoRecognizeColor = !a.configAutoRecognizeColor
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor)}
-	})
-	menu.AddSubMenuItem("设置最大历史记录条数"+fmt.Sprintf("(当前: %d)", a.configHistoryMax), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
+	menu.AddSubMenuItem("设置最大历史记录条数"+fmt.Sprintf("(当前: %d/%d)", len(a.history.GetAll()), a.configHistoryMax), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置最大历史记录条数"}
 		top := a.history.GetTop()
 		if top == nil || top.Type != TypeText {
@@ -66,6 +58,14 @@ func (a *App) addConfigMenuAction() {
 
 		a.configHistoryMax = uint(digit)
 		a.history.SetMaxSize(a.configHistoryMax)
+	})
+	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete).Click(func() {
+		a.configSingleDelete = !a.configSingleDelete
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete)}
+	})
+	menu.AddSubMenuItemCheckbox("自动识别颜色", "", a.configAutoRecognizeColor).Click(func() {
+		a.configAutoRecognizeColor = !a.configAutoRecognizeColor
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor)}
 	})
 	menu.AddSubMenuItemCheckbox("相同内容只保留最新", "开启后相同内容的剪贴板记录只保留最近一条", a.configKeepLatestOnly.Load()).Click(func() {
 		a.configKeepLatestOnly.Store(!a.configKeepLatestOnly.Load())
