@@ -125,6 +125,11 @@ func (a *App) addConfigMenuAction() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置图片重命名: %v", a.configImageRename.Load())}
 		a.requestSave()
 	})
+	menu.AddSubMenuItemCheckbox("置顶【搜索】菜单", "开启后【搜索】菜单显示在菜单最顶部，关闭时保持默认位置", a.configSearchMenuTop.Load()).Click(func() {
+		a.configSearchMenuTop.Store(!a.configSearchMenuTop.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置置顶【搜索】菜单: %v", a.configSearchMenuTop.Load())}
+		a.requestSave()
+	})
 
 	shareMenu := menu.AddSubMenuItem("局域网共享", "")
 	{

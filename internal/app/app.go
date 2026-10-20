@@ -35,6 +35,7 @@ type App struct {
 	configHistoryMax         atomic.Uint32
 	configKeepLatestOnly     atomic.Bool
 	configSingleDelete       atomic.Bool
+	configSearchMenuTop      atomic.Bool
 	configImageRename        atomic.Bool
 	configAutoRecognizeColor atomic.Bool
 	configSaveLogToLocal     atomic.Bool
@@ -163,6 +164,7 @@ func (a *App) loadLocalState() {
 	a.configHistoryMax.Store(uint32(localConfig.HistoryMax))
 	a.configKeepLatestOnly.Store(localConfig.KeepLatestOnly)
 	a.configSingleDelete.Store(localConfig.SingleDelete)
+	a.configSearchMenuTop.Store(localConfig.SearchMenuTop)
 	a.configImageRename.Store(localConfig.ImageRename)
 	a.configAutoRecognizeColor.Store(localConfig.AutoRecognizeColor)
 	a.configSaveLogToLocal.Store(localConfig.SaveLogToLocal)
@@ -247,6 +249,7 @@ func (a *App) saveStateToDisk() {
 	config.HistoryMax = uint(a.configHistoryMax.Load())
 	config.KeepLatestOnly = a.configKeepLatestOnly.Load()
 	config.SingleDelete = a.configSingleDelete.Load()
+	config.SearchMenuTop = a.configSearchMenuTop.Load()
 	config.ImageRename = a.configImageRename.Load()
 	config.AutoRecognizeColor = a.configAutoRecognizeColor.Load()
 	config.SaveLogToLocal = a.configSaveLogToLocal.Load()

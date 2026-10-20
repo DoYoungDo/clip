@@ -23,13 +23,25 @@ func (a *App) onTrayClick(menu systray.IMenu) {
 	systray.ResetMenu()
 	a.flushMenuTitle()
 
-	if a.addHistoryMenuAction() {
-		addSeparator()
+	if a.configSearchMenuTop.Load() {
+		a.addSearchMenuAction()
+		if a.hasHistoryMenuItems() || a.hasGroupMenuItems() {
+			addSeparator()
+		}
+		a.addHistoryMenuAction()
+		if a.hasHistoryMenuItems() && a.hasGroupMenuItems() {
+			addSeparator()
+		}
+		a.addGroupMenuAction()
+	} else {
+		if a.addHistoryMenuAction() {
+			addSeparator()
+		}
+		if a.addGroupMenuAction() {
+			addSeparator()
+		}
+		a.addSearchMenuAction()
 	}
-	if a.addGroupMenuAction() {
-		addSeparator()
-	}
-	a.addSearchMenuAction()
 
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "显示菜单"}
 	menu.ShowMenu()
@@ -41,6 +53,12 @@ func (a *App) onTrayRClick(menu systray.IMenu) {
 	systray.ResetMenu()
 	a.flushMenuTitle()
 
+	searchTop := a.configSearchMenuTop.Load()
+	if searchTop {
+		a.addSearchMenuAction()
+		addSeparator()
+	}
+
 	if a.addHistoryMenuAction() {
 		addSeparator()
 	}
@@ -50,8 +68,10 @@ func (a *App) onTrayRClick(menu systray.IMenu) {
 		addSeparator()
 	}
 	a.addCreateGroupMenuCmd()
-	addSeparator()
-	a.addSearchMenuAction()
+	if !searchTop {
+		addSeparator()
+		a.addSearchMenuAction()
+	}
 	addSeparator()
 	a.addConfigMenuAction()
 	addSeparator()
@@ -267,6 +287,38 @@ func (a *App) menuItemTitle(item *ClipItem) string {
 		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix.Load(), a.configHighlightSuffix.Load()), a.configTimeFormat.Load())
 	}
 	return formatMenuItemWithText(item, itemDisplayText(item), a.configTimeFormat.Load())
+}
+
+// hasHistoryMenuItems 判断主历史按当前搜索条件是否有可显示条目，与 addHistoryMenuAction 的条目过滤保持一致。
+func (a *App) hasHistoryMenuItems() bool {
+	for _, item := range a.history.GetAll() {
+		if a.matchSearch(item) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasGroupMenuItems 判断按当前搜索条件是否有可显示的分组，与 addGroupMenuAction 的分组过滤保持一致。
+func (a *App) hasGroupMenuItems() bool {
+	a.groupsMu.RLock()
+	defer a.groupsMu.RUnlock()
+
+	for _, name := range a.groupNames {
+		group, ok := a.groups[name]
+		if !ok || group == nil {
+			continue
+		}
+		if !a.searchEnable {
+			return true
+		}
+		for _, item := range group.History.GetAll() {
+			if a.matchSearch(item) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *App) addHistoryMenuAction() bool {

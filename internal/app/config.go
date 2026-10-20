@@ -34,6 +34,7 @@ type Config struct {
 	HistoryMax         uint            `json:"history_max"`
 	KeepLatestOnly     bool            `json:"keep_latest_only"`
 	SingleDelete       bool            `json:"single_delete"`
+	SearchMenuTop      bool            `json:"search_menu_top"`
 	ImageRename        bool            `json:"image_rename"`
 	AutoRecognizeColor bool            `json:"auto_recognize_color"`
 	SaveLogToLocal     bool            `json:"save_log_to_local"`
@@ -49,6 +50,7 @@ func NewDefaultConfig() *Config {
 		HistoryMax:         50,
 		KeepLatestOnly:     false,
 		SingleDelete:       false,
+		SearchMenuTop:      false,
 		ImageRename:        false,
 		AutoRecognizeColor: false,
 		SaveLogToLocal:     false,

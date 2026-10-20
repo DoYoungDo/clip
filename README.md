@@ -107,6 +107,7 @@
 - `history_max`: 最大历史条数（1-300）
 - `keep_latest_only`: 相同内容只保留最近一条
 - `single_delete`: 启用单条删除
+- `search_menu_top`: 置顶【搜索】菜单
 - `auto_recognize_color`: 自动识别颜色
 - `save_log_to_local`: 退出时保存日志
 - `highlight_prefix` / `highlight_suffix`: 搜索高亮标记前后字符，默认 【 和 】

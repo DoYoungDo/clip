@@ -274,6 +274,54 @@ func TestMatchSearch(t *testing.T) {
 	}
 }
 
+func TestHasHistoryAndGroupMenuItems(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+
+	if app.hasHistoryMenuItems() {
+		t.Fatalf("无历史时历史区应视为无内容")
+	}
+	if app.hasGroupMenuItems() {
+		t.Fatalf("无分组时分组区应视为无内容")
+	}
+
+	app.history.Add(NewClipItem(TypeText, []byte("hello")))
+	group := NewGroup("g", true, 10)
+	group.History.Add(NewClipItem(TypeText, []byte("hello-group")))
+	app.groups["g"] = group
+	app.groupNames = append(app.groupNames, "g")
+
+	if !app.hasHistoryMenuItems() {
+		t.Fatalf("有历史时历史区应视为有内容")
+	}
+	if !app.hasGroupMenuItems() {
+		t.Fatalf("无搜索时分组区应视为有内容")
+	}
+
+	app.searchEnable = true
+	app.searchText = "nomatch"
+	if app.hasHistoryMenuItems() {
+		t.Fatalf("搜索无匹配时历史区应视为无内容")
+	}
+	if app.hasGroupMenuItems() {
+		t.Fatalf("搜索无匹配时分组区应视为无内容")
+	}
+
+	app.searchText = "hello"
+	if !app.hasHistoryMenuItems() {
+		t.Fatalf("搜索命中历史时历史区应视为有内容")
+	}
+	if !app.hasGroupMenuItems() {
+		t.Fatalf("搜索命中分组条目时分组区应视为有内容")
+	}
+
+	app2 := NewApp(NewAppLogger())
+	app2.groupNames = []string{"ghost"}
+	if app2.hasGroupMenuItems() {
+		t.Fatalf("分组名无对应分组时应视为无内容")
+	}
+}
+
 func TestCurrentVersionFallback(t *testing.T) {
 	original := version
 	defer func() { version = original }()
@@ -562,6 +610,35 @@ func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
 	}
 	if found == nil || found.Name != "我的截图" {
 		t.Fatalf("重启后图片名称应持久化: %#v", found)
+	}
+}
+
+func TestSaveLoadLocalStatePersistsSearchMenuTop(t *testing.T) {
+	tempDir := t.TempDir()
+	configPathOverride = filepath.Join(tempDir, "config.json")
+	legacyConfigPathOverride = filepath.Join(tempDir, "legacy-config.json")
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
+
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.configSearchMenuTop.Store(true)
+	app.saveLocalState()
+
+	reloaded := NewApp(NewAppLogger())
+	reloaded.loadLocalState()
+	if !reloaded.configSearchMenuTop.Load() {
+		t.Fatalf("开启搜索菜单置顶后应持久化")
+	}
+
+	reloaded.configSearchMenuTop.Store(false)
+	reloaded.saveLocalState()
+	again := NewApp(NewAppLogger())
+	again.loadLocalState()
+	if again.configSearchMenuTop.Load() {
+		t.Fatalf("关闭搜索菜单置顶后应持久化为关闭状态")
 	}
 }
 
