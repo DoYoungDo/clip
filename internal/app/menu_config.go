@@ -12,13 +12,7 @@ import (
 
 func (a *App) addCleanHistoryMenuCmd() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`清空历史记录`菜单"}
-	if a.clearState == Normal {
-		menu := systray.AddMenuItem("清空历史记录", "【清空历史记录】会将历史记录清空，但是不会清空剪贴板中的内容")
-		menu.Click(func() {
-			a.clearState = ReadyToClear
-			global_log_channel <- LogEntry{Kind: KindInfo, Content: "准备清空历史记录，等待确认..."}
-		})
-	} else {
+	if a.clearState == ReadyToClear {
 		menu := systray.AddMenuItem("确认/取消清空历史记录？", "")
 		menuOk := menu.AddSubMenuItem("确认清空？", "")
 		menuOk.Click(func() {
@@ -31,7 +25,23 @@ func (a *App) addCleanHistoryMenuCmd() {
 			a.clearState = Normal
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "取消清空历史记录"}
 		})
+		return
 	}
+
+	tooltip := "【清空历史记录】会将历史记录清空，但是不会清空剪贴板中的内容"
+	if !a.configConfirmClearHistory.Load() {
+		tooltip += "，已关闭询问，点击后直接清空"
+	}
+	menu := systray.AddMenuItem("清空历史记录", tooltip)
+	menu.Click(func() {
+		if !a.configConfirmClearHistory.Load() {
+			a.history.Clear()
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: "已关闭询问，直接清空历史记录"}
+			return
+		}
+		a.clearState = ReadyToClear
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: "准备清空历史记录，等待确认..."}
+	})
 }
 
 func (a *App) addConfigMenuAction() {
@@ -94,6 +104,11 @@ func (a *App) addConfigMenuAction() {
 
 		a.configTimeFormat.Store(format)
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置时间格式: %s", a.configTimeFormat.Load())}
+		a.requestSave()
+	})
+	menu.AddSubMenuItemCheckbox("清空历史时询问", "【清空历史时询问】开启后点击清空历史记录需二次确认，关闭后点击直接清空", a.configConfirmClearHistory.Load()).Click(func() {
+		a.configConfirmClearHistory.Store(!a.configConfirmClearHistory.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置清空历史时询问: %v", a.configConfirmClearHistory.Load())}
 		a.requestSave()
 	})
 	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete.Load()).Click(func() {

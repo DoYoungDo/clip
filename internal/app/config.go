@@ -31,32 +31,34 @@ type TranslatorData struct {
 }
 
 type Config struct {
-	HistoryMax         uint            `json:"history_max"`
-	KeepLatestOnly     bool            `json:"keep_latest_only"`
-	SingleDelete       bool            `json:"single_delete"`
-	SearchMenuTop      bool            `json:"search_menu_top"`
-	ImageRename        bool            `json:"image_rename"`
-	AutoRecognizeColor bool            `json:"auto_recognize_color"`
-	SaveLogToLocal     bool            `json:"save_log_to_local"`
-	HighlightPrefix    string          `json:"highlight_prefix"`
-	HighlightSuffix    string          `json:"highlight_suffix"`
-	TimeFormat         string          `json:"time_format"`
-	Data               HistoryData     `json:"data"`
-	Translator         *TranslatorData `json:"translator_data"`
+	HistoryMax          uint            `json:"history_max"`
+	KeepLatestOnly      bool            `json:"keep_latest_only"`
+	ConfirmClearHistory bool            `json:"confirm_clear_history"`
+	SingleDelete        bool            `json:"single_delete"`
+	SearchMenuTop       bool            `json:"search_menu_top"`
+	ImageRename         bool            `json:"image_rename"`
+	AutoRecognizeColor  bool            `json:"auto_recognize_color"`
+	SaveLogToLocal      bool            `json:"save_log_to_local"`
+	HighlightPrefix     string          `json:"highlight_prefix"`
+	HighlightSuffix     string          `json:"highlight_suffix"`
+	TimeFormat          string          `json:"time_format"`
+	Data                HistoryData     `json:"data"`
+	Translator          *TranslatorData `json:"translator_data"`
 }
 
 func NewDefaultConfig() *Config {
 	return &Config{
-		HistoryMax:         50,
-		KeepLatestOnly:     false,
-		SingleDelete:       false,
-		SearchMenuTop:      false,
-		ImageRename:        false,
-		AutoRecognizeColor: false,
-		SaveLogToLocal:     false,
-		HighlightPrefix:    defaultHighlightPrefix,
-		HighlightSuffix:    defaultHighlightSuffix,
-		TimeFormat:         defaultTimeFormat,
+		HistoryMax:          50,
+		KeepLatestOnly:      false,
+		ConfirmClearHistory: true,
+		SingleDelete:        false,
+		SearchMenuTop:       false,
+		ImageRename:         false,
+		AutoRecognizeColor:  false,
+		SaveLogToLocal:      false,
+		HighlightPrefix:     defaultHighlightPrefix,
+		HighlightSuffix:     defaultHighlightSuffix,
+		TimeFormat:          defaultTimeFormat,
 		Data: HistoryData{
 			History:    nil,
 			Groups:     make(map[string]HistoryGroupData),

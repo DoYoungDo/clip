@@ -32,13 +32,14 @@ type App struct {
 	menuTitle       string
 	translateSeq    uint64
 
-	configHistoryMax         atomic.Uint32
-	configKeepLatestOnly     atomic.Bool
-	configSingleDelete       atomic.Bool
-	configSearchMenuTop      atomic.Bool
-	configImageRename        atomic.Bool
-	configAutoRecognizeColor atomic.Bool
-	configSaveLogToLocal     atomic.Bool
+	configHistoryMax          atomic.Uint32
+	configKeepLatestOnly      atomic.Bool
+	configConfirmClearHistory atomic.Bool
+	configSingleDelete        atomic.Bool
+	configSearchMenuTop       atomic.Bool
+	configImageRename         atomic.Bool
+	configAutoRecognizeColor  atomic.Bool
+	configSaveLogToLocal      atomic.Bool
 
 	configHighlightPrefix atomicString
 	configHighlightSuffix atomicString
@@ -163,6 +164,7 @@ func (a *App) loadLocalState() {
 
 	a.configHistoryMax.Store(uint32(localConfig.HistoryMax))
 	a.configKeepLatestOnly.Store(localConfig.KeepLatestOnly)
+	a.configConfirmClearHistory.Store(localConfig.ConfirmClearHistory)
 	a.configSingleDelete.Store(localConfig.SingleDelete)
 	a.configSearchMenuTop.Store(localConfig.SearchMenuTop)
 	a.configImageRename.Store(localConfig.ImageRename)
@@ -248,6 +250,7 @@ func (a *App) saveStateToDisk() {
 	config := NewDefaultConfig()
 	config.HistoryMax = uint(a.configHistoryMax.Load())
 	config.KeepLatestOnly = a.configKeepLatestOnly.Load()
+	config.ConfirmClearHistory = a.configConfirmClearHistory.Load()
 	config.SingleDelete = a.configSingleDelete.Load()
 	config.SearchMenuTop = a.configSearchMenuTop.Load()
 	config.ImageRename = a.configImageRename.Load()

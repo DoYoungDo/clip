@@ -613,6 +613,40 @@ func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
 	}
 }
 
+func TestSaveLoadLocalStatePersistsConfirmClearHistory(t *testing.T) {
+	tempDir := t.TempDir()
+	configPathOverride = filepath.Join(tempDir, "config.json")
+	legacyConfigPathOverride = filepath.Join(tempDir, "legacy-config.json")
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
+
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.loadLocalState()
+	if !app.configConfirmClearHistory.Load() {
+		t.Fatalf("清空历史时询问应默认开启")
+	}
+
+	app.configConfirmClearHistory.Store(false)
+	app.saveLocalState()
+
+	reloaded := NewApp(NewAppLogger())
+	reloaded.loadLocalState()
+	if reloaded.configConfirmClearHistory.Load() {
+		t.Fatalf("关闭后应持久化为关闭状态")
+	}
+
+	reloaded.configConfirmClearHistory.Store(true)
+	reloaded.saveLocalState()
+	again := NewApp(NewAppLogger())
+	again.loadLocalState()
+	if !again.configConfirmClearHistory.Load() {
+		t.Fatalf("重新开启后应持久化为开启状态")
+	}
+}
+
 func TestSaveLoadLocalStatePersistsSearchMenuTop(t *testing.T) {
 	tempDir := t.TempDir()
 	configPathOverride = filepath.Join(tempDir, "config.json")
