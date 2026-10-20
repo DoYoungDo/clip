@@ -111,12 +111,12 @@ func (a *App) addConfigMenuAction() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置清空历史时不询问: %v", !a.configConfirmClearHistory.Load())}
 		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete.Load()).Click(func() {
+	menu.AddSubMenuItemCheckbox("单独删除项", "开启后右键历史记录项可单独删除该条记录", a.configSingleDelete.Load()).Click(func() {
 		a.configSingleDelete.Store(!a.configSingleDelete.Load())
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete.Load())}
 		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("自动识别颜色", "", a.configAutoRecognizeColor.Load()).Click(func() {
+	menu.AddSubMenuItemCheckbox("自动识别颜色", "开启后自动识别文本中的颜色值，右键条目可复制 Hex/RGB", a.configAutoRecognizeColor.Load()).Click(func() {
 		a.configAutoRecognizeColor.Store(!a.configAutoRecognizeColor.Load())
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor.Load())}
 		a.requestSave()
@@ -156,7 +156,7 @@ func (a *App) addConfigMenuAction() {
 		}
 		a.shareServerMu.RUnlock()
 
-		shareMenu.AddSubMenuItemCheckbox("局域网共享"+serverLabel, "", server != nil).Click(func() {
+		shareMenu.AddSubMenuItemCheckbox("局域网共享"+serverLabel, "开启后本机作为服务端共享剪贴板，关闭后停止共享", server != nil).Click(func() {
 			a.shareServerMu.RLock()
 			currentServer := a.shareServer
 			a.shareServerMu.RUnlock()
@@ -181,7 +181,7 @@ func (a *App) addConfigMenuAction() {
 			}
 		})
 
-		shareMenu.AddSubMenuItem("连接到", "").Click(func() {
+		shareMenu.AddSubMenuItem("连接到", "复制对方地址（ip:端口）后点击，连接对方的剪贴板共享").Click(func() {
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: "连接到局域网共享"}
 			top := a.history.GetTop()
 			if top == nil || top.Type != TypeText {
@@ -229,7 +229,7 @@ func (a *App) addConfigMenuAction() {
 		a.shareClientsMu.RUnlock()
 
 		for addr, client := range clientSnapshot {
-			shareMenu.AddSubMenuItemCheckbox(addr, "", true).Click(func() {
+			shareMenu.AddSubMenuItemCheckbox(addr, "点击断开与该地址的共享连接", true).Click(func() {
 				global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("断开与局域网共享%s的连接", addr)}
 				client.Close()
 				a.shareClientsMu.Lock()
@@ -245,7 +245,7 @@ func (a *App) addConfigMenuAction() {
 		{
 			currentLang := a.currentTranslateToLang()
 			for _, lang := range translator.TransLangFactory() {
-				langMenu.AddSubMenuItemCheckbox(string(lang), "", currentLang == lang).Click(func() {
+				langMenu.AddSubMenuItemCheckbox(string(lang), "将剪贴板文本翻译为该语言", currentLang == lang).Click(func() {
 					a.setTranslateToLang(lang)
 					a.requestSave()
 				})
@@ -281,7 +281,7 @@ func (a *App) addConfigMenuAction() {
 			if translatorImp.IsEnabled() {
 				translatorName = fmt.Sprintf("%v（已配置密钥）", translatorName)
 			}
-			transLateMenu.AddSubMenuItemCheckbox(translatorName, "", a.currentTranslator() == translatorImp).Click(func() {
+			transLateMenu.AddSubMenuItemCheckbox(translatorName, "点击启用或停用该翻译器；未配置密钥时使用最新剪贴板文本作为密钥", a.currentTranslator() == translatorImp).Click(func() {
 				if a.currentTranslator() == translatorImp && translatorImp.IsEnabled() {
 					a.setTranslator(nil)
 					a.requestSave()
@@ -300,10 +300,10 @@ func (a *App) addConfigMenuAction() {
 		}
 	}
 
-	menu.AddSubMenuItem("打开配置文件目录", "").Click(func() {
+	menu.AddSubMenuItem("打开配置文件目录", "打开配置文件和日志所在的系统目录").Click(func() {
 		openDir(getAppDataDir())
 	})
-	menu.AddSubMenuItemCheckbox("退出时保存日志", "", a.configSaveLogToLocal.Load()).Click(func() {
+	menu.AddSubMenuItemCheckbox("退出时保存日志", "开启后退出程序时将运行日志保存到配置目录下的 clip.log", a.configSaveLogToLocal.Load()).Click(func() {
 		a.configSaveLogToLocal.Store(!a.configSaveLogToLocal.Load())
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", a.configSaveLogToLocal.Load())}
 		a.requestSave()
