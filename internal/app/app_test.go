@@ -682,33 +682,123 @@ func TestBuildItemMenuInfo(t *testing.T) {
 	colorText := NewClipItem(TypeText, []byte("#aabbcc"))
 	image := NewClipItem(TypeImage, []byte("img"))
 
-	if info := app.buildItemMenuInfo(plainText); info.hasSub {
+	if info := app.buildItemMenuInfo(plainText, false); info.hasSub {
 		t.Fatalf("默认配置下不应有子菜单")
 	}
 
+	if info := app.buildItemMenuInfo(plainText, true); !info.hasMove || !info.hasSub {
+		t.Fatalf("主历史条目应显示移动到分组子菜单")
+	}
+
 	app.configSingleDelete.Store(true)
-	if info := app.buildItemMenuInfo(plainText); !info.hasSub || !info.hasDelete {
+	if info := app.buildItemMenuInfo(plainText, false); !info.hasSub || !info.hasDelete {
 		t.Fatalf("开启单独删除后所有条目应有子菜单")
 	}
 	app.configSingleDelete.Store(false)
 
 	app.configAutoRecognizeColor.Store(true)
-	if info := app.buildItemMenuInfo(colorText); !info.hasColor || !info.hasSub || info.colorHex != "#aabbcc" || info.colorRGB != "170,187,204" {
+	if info := app.buildItemMenuInfo(colorText, false); !info.hasColor || !info.hasSub || info.colorHex != "#aabbcc" || info.colorRGB != "170,187,204" {
 		t.Fatalf("颜色文本应命中颜色识别: %+v", info)
 	}
-	if info := app.buildItemMenuInfo(plainText); info.hasColor || info.hasSub {
+	if info := app.buildItemMenuInfo(plainText, false); info.hasColor || info.hasSub {
 		t.Fatalf("非颜色文本不应命中颜色识别")
 	}
-	if info := app.buildItemMenuInfo(image); info.hasColor {
+	if info := app.buildItemMenuInfo(image, false); info.hasColor {
 		t.Fatalf("图片不应命中颜色识别")
 	}
 	app.configAutoRecognizeColor.Store(false)
 
 	app.configImageRename.Store(true)
-	if info := app.buildItemMenuInfo(image); !info.canRename || !info.hasSub {
+	if info := app.buildItemMenuInfo(image, false); !info.canRename || !info.hasSub {
 		t.Fatalf("开启图片重命名后图片应有子菜单")
 	}
-	if info := app.buildItemMenuInfo(plainText); info.canRename {
+	if info := app.buildItemMenuInfo(plainText, false); info.canRename {
 		t.Fatalf("文本不应有重命名子菜单")
+	}
+}
+
+func TestCanMoveToGroup(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+
+	if app.canMoveToGroup() {
+		t.Fatalf("默认配置下不应启用移动到分组")
+	}
+
+	app.configMoveToGroup.Store(true)
+	if app.canMoveToGroup() {
+		t.Fatalf("无分组时不应显示移动到分组")
+	}
+
+	group := NewGroup("g", false, 10)
+	app.groups["g"] = group
+	app.groupNames = []string{"g"}
+	if !app.canMoveToGroup() {
+		t.Fatalf("开启配置且存在分组时应显示移动到分组")
+	}
+
+	app.configMoveToGroup.Store(false)
+	if app.canMoveToGroup() {
+		t.Fatalf("关闭配置后不应显示移动到分组")
+	}
+}
+
+func TestMoveItemToGroup(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	group := NewGroup("目标分组", false, 10)
+	app.groups["目标分组"] = group
+	app.groupNames = []string{"目标分组"}
+
+	item := NewClipItem(TypeText, []byte("move-me"))
+	app.history.Add(item)
+
+	app.moveItemToGroup(item, group)
+
+	if got := len(app.history.GetAll()); got != 0 {
+		t.Fatalf("主历史应移除被移动条目，实际剩余 %d 条", got)
+	}
+	top := group.History.GetTop()
+	if top == nil || string(top.Content) != "move-me" {
+		t.Fatalf("目标分组顶部应为被移动条目，实际 %#v", top)
+	}
+}
+
+func TestMoveItemToGroupHandlesInvalidInput(t *testing.T) {
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	group := NewGroup("g", false, 10)
+	item := NewClipItem(TypeText, []byte("x"))
+	app.history.Add(item)
+
+	app.moveItemToGroup(nil, group)
+	app.moveItemToGroup(item, nil)
+
+	if len(app.history.GetAll()) != 1 {
+		t.Fatalf("非法参数不应移除主历史条目")
+	}
+	if len(group.History.GetAll()) != 0 {
+		t.Fatalf("非法参数不应向分组添加条目")
+	}
+}
+
+func TestSaveLoadLocalStatePersistsMoveToGroup(t *testing.T) {
+	tempDir := t.TempDir()
+	configPathOverride = filepath.Join(tempDir, "config.json")
+	legacyConfigPathOverride = filepath.Join(tempDir, "legacy-config.json")
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
+
+	resetTestLogChannel()
+	app := NewApp(NewAppLogger())
+	app.configMoveToGroup.Store(true)
+	app.saveLocalState()
+
+	reloaded := NewApp(NewAppLogger())
+	reloaded.loadLocalState()
+	if !reloaded.configMoveToGroup.Load() {
+		t.Fatalf("移动到分组配置应持久化")
 	}
 }

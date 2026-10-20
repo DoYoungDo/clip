@@ -136,6 +136,7 @@ type itemMenuInfo struct {
 	canRename bool
 	hasColor  bool
 	hasDelete bool
+	hasMove   bool
 	hasSub    bool
 	colorHex  string
 	colorRGB  string
@@ -146,11 +147,12 @@ func (a *App) canRenameImage(item *ClipItem) bool {
 	return item.Type == TypeImage && a.configImageRename.Load()
 }
 
-// buildItemMenuInfo 一次性解析条目的右键菜单能力（颜色识别/重命名/删除）。
-func (a *App) buildItemMenuInfo(item *ClipItem) itemMenuInfo {
+// buildItemMenuInfo 一次性解析条目的右键菜单能力（颜色识别/重命名/删除/移动到分组）。
+func (a *App) buildItemMenuInfo(item *ClipItem, hasMove bool) itemMenuInfo {
 	info := itemMenuInfo{
 		canRename: a.canRenameImage(item),
 		hasDelete: a.configSingleDelete.Load(),
+		hasMove:   hasMove,
 	}
 
 	if a.configAutoRecognizeColor.Load() && item.Type == TypeText {
@@ -164,7 +166,7 @@ func (a *App) buildItemMenuInfo(item *ClipItem) itemMenuInfo {
 		}
 	}
 
-	info.hasSub = info.canRename || info.hasColor || info.hasDelete
+	info.hasSub = info.canRename || info.hasColor || info.hasDelete || info.hasMove
 	return info
 }
 
@@ -216,6 +218,9 @@ func (a *App) addItemSubMenu(menu *systray.MenuItem, item *ClipItem, h *History,
 	}
 
 	a.addCopyMenuItem(menu, item, logPrefix, formatMenuItemTooltip(item))
+	if info.hasMove {
+		a.addMoveToGroupMenuItems(menu, item)
+	}
 	if info.hasColor {
 		a.addColorRecognizeMenuItems(menu, item, info)
 	}
@@ -331,7 +336,7 @@ func (a *App) addHistoryMenuAction() bool {
 
 		var info itemMenuInfo
 		if a.showMenuState == RClick {
-			info = a.buildItemMenuInfo(item)
+			info = a.buildItemMenuInfo(item, a.canMoveToGroup())
 		}
 		menu := systray.AddMenuItem(a.menuItemTitle(item), itemMenuTooltip(item, info))
 		switch a.showMenuState {

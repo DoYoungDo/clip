@@ -151,7 +151,7 @@ func (a *App) addGroupMenuAction() bool {
 		for _, item := range matched {
 			var info itemMenuInfo
 			if a.showMenuState == RClick {
-				info = a.buildItemMenuInfo(item)
+				info = a.buildItemMenuInfo(item, false)
 			}
 			entryMenu := groupMenu.AddSubMenuItem(a.menuItemTitle(item), itemMenuTooltip(item, info))
 			switch a.showMenuState {
@@ -172,4 +172,57 @@ func (a *App) addGroupMenuAction() bool {
 	}
 
 	return addedGroups > 0
+}
+
+// canMoveToGroup 判断是否显示“移动到分组”：配置开启且存在分组。
+func (a *App) canMoveToGroup() bool {
+	if !a.configMoveToGroup.Load() {
+		return false
+	}
+
+	a.groupsMu.RLock()
+	defer a.groupsMu.RUnlock()
+
+	for _, name := range a.groupNames {
+		if group := a.groups[name]; group != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// addMoveToGroupMenuItems 添加“移动到分组”子菜单，列出全部分组。
+func (a *App) addMoveToGroupMenuItems(menu *systray.MenuItem, item *ClipItem) {
+	a.groupsMu.RLock()
+	names := append([]string(nil), a.groupNames...)
+	groups := make(map[string]*Group, len(names))
+	for _, name := range names {
+		groups[name] = a.groups[name]
+	}
+	a.groupsMu.RUnlock()
+
+	moveMenu := menu.AddSubMenuItem("移动到分组", "")
+	for _, name := range names {
+		group := groups[name]
+		if group == nil {
+			continue
+		}
+		target := group
+		moveMenu.AddSubMenuItem(name, "").Click(func() {
+			a.moveItemToGroup(item, target)
+		})
+	}
+}
+
+// moveItemToGroup 将主历史条目移动到目标分组顶部。
+func (a *App) moveItemToGroup(item *ClipItem, group *Group) {
+	if item == nil || group == nil || group.History == nil {
+		return
+	}
+
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("移动历史记录到分组 %s: %s", group.Name, formatMenuItem(item))}
+	a.addItemToHistory(group.History, item.Clone())
+	if a.history.Delete(item) {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已移动到分组 %s", group.Name)}
+	}
 }

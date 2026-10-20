@@ -37,6 +37,7 @@ type Config struct {
 	SingleDelete        bool            `json:"single_delete"`
 	SearchMenuTop       bool            `json:"search_menu_top"`
 	ImageRename         bool            `json:"image_rename"`
+	MoveToGroup         bool            `json:"move_to_group"`
 	AutoRecognizeColor  bool            `json:"auto_recognize_color"`
 	SaveLogToLocal      bool            `json:"save_log_to_local"`
 	HighlightPrefix     string          `json:"highlight_prefix"`
@@ -54,6 +55,7 @@ func NewDefaultConfig() *Config {
 		SingleDelete:        false,
 		SearchMenuTop:       false,
 		ImageRename:         false,
+		MoveToGroup:         false,
 		AutoRecognizeColor:  false,
 		SaveLogToLocal:      false,
 		HighlightPrefix:     defaultHighlightPrefix,

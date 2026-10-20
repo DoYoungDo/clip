@@ -109,6 +109,7 @@
 - `confirm_clear_history`: 清空历史时不询问（开关默认关闭，点击清空需二次确认）
 - `single_delete`: 启用单条删除
 - `search_menu_top`: 置顶【搜索】菜单
+- `move_to_group`: 移动到分组
 - `auto_recognize_color`: 自动识别颜色
 - `save_log_to_local`: 退出时保存日志
 - `highlight_prefix` / `highlight_suffix`: 搜索高亮标记前后字符，默认 【 和 】
