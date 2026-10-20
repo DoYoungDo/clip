@@ -106,7 +106,7 @@
 
 - `history_max`: 最大历史条数（1-300）
 - `keep_latest_only`: 相同内容只保留最近一条
-- `confirm_clear_history`: 清空历史时询问确认
+- `confirm_clear_history`: 清空历史时不询问（开关默认关闭，点击清空需二次确认）
 - `single_delete`: 启用单条删除
 - `search_menu_top`: 置顶【搜索】菜单
 - `auto_recognize_color`: 自动识别颜色
