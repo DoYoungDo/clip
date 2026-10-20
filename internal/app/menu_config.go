@@ -106,9 +106,9 @@ func (a *App) addConfigMenuAction() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置时间格式: %s", a.configTimeFormat.Load())}
 		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("清空历史时询问", "【清空历史时询问】开启后点击清空历史记录需二次确认，关闭后点击直接清空", a.configConfirmClearHistory.Load()).Click(func() {
+	menu.AddSubMenuItemCheckbox("清空历史时不询问", "【清空历史时不询问】开启后点击清空历史记录直接清空，关闭时需二次确认", !a.configConfirmClearHistory.Load()).Click(func() {
 		a.configConfirmClearHistory.Store(!a.configConfirmClearHistory.Load())
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置清空历史时询问: %v", a.configConfirmClearHistory.Load())}
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置清空历史时不询问: %v", !a.configConfirmClearHistory.Load())}
 		a.requestSave()
 	})
 	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete.Load()).Click(func() {
