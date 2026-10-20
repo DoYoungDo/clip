@@ -32,16 +32,21 @@ type App struct {
 	menuTitle       string
 	translateSeq    uint64
 
-	configHistoryMax         uint
+	configHistoryMax         atomic.Uint32
 	configKeepLatestOnly     atomic.Bool
-	configSingleDelete       bool
-	configImageRename        bool
-	configAutoRecognizeColor bool
-	configSaveLogToLocal     bool
+	configSingleDelete       atomic.Bool
+	configImageRename        atomic.Bool
+	configAutoRecognizeColor atomic.Bool
+	configSaveLogToLocal     atomic.Bool
 
-	configHighlightPrefix string
-	configHighlightSuffix string
-	configTimeFormat      string
+	configHighlightPrefix atomicString
+	configHighlightSuffix atomicString
+	configTimeFormat      atomicString
+
+	saveTrigger chan struct{}
+	saveStop    chan struct{}
+	saveDone    chan struct{}
+	saveMu      sync.Mutex
 
 	searchEnable  bool
 	searchText    string
@@ -52,17 +57,19 @@ type App struct {
 
 func NewApp(logger *AppLogger) *App {
 	app := &App{
-		logger:                logger,
-		groups:                make(map[string]*Group),
-		groupNames:            []string{},
-		echoGuard:             &echoSuppressor{},
-		shareClients:          make(map[string]*ShareClient),
-		configHistoryMax:      const_max_history,
-		configHighlightPrefix: defaultHighlightPrefix,
-		configHighlightSuffix: defaultHighlightSuffix,
-		configTimeFormat:      defaultTimeFormat,
+		logger:       logger,
+		groups:       make(map[string]*Group),
+		groupNames:   []string{},
+		echoGuard:    &echoSuppressor{},
+		shareClients: make(map[string]*ShareClient),
+		saveTrigger:  make(chan struct{}, 1),
 	}
-	app.history = NewHistory(app.configHistoryMax)
+	app.configHistoryMax.Store(uint32(const_max_history))
+	app.configHighlightPrefix.Store(defaultHighlightPrefix)
+	app.configHighlightSuffix.Store(defaultHighlightSuffix)
+	app.configTimeFormat.Store(defaultTimeFormat)
+	app.history = NewHistory(uint(app.configHistoryMax.Load()))
+	app.history.SetOnChange(app.requestSave)
 	return app
 }
 
@@ -153,33 +160,35 @@ func (a *App) loadLocalState() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("配置加载来源: %s", source)}
 	}
 
-	a.configHistoryMax = localConfig.HistoryMax
+	a.configHistoryMax.Store(uint32(localConfig.HistoryMax))
 	a.configKeepLatestOnly.Store(localConfig.KeepLatestOnly)
-	a.configSingleDelete = localConfig.SingleDelete
-	a.configImageRename = localConfig.ImageRename
-	a.configAutoRecognizeColor = localConfig.AutoRecognizeColor
-	a.configSaveLogToLocal = localConfig.SaveLogToLocal
+	a.configSingleDelete.Store(localConfig.SingleDelete)
+	a.configImageRename.Store(localConfig.ImageRename)
+	a.configAutoRecognizeColor.Store(localConfig.AutoRecognizeColor)
+	a.configSaveLogToLocal.Store(localConfig.SaveLogToLocal)
 	if localConfig.HighlightPrefix != "" {
-		a.configHighlightPrefix = localConfig.HighlightPrefix
+		a.configHighlightPrefix.Store(localConfig.HighlightPrefix)
 	}
 	if localConfig.HighlightSuffix != "" {
-		a.configHighlightSuffix = localConfig.HighlightSuffix
+		a.configHighlightSuffix.Store(localConfig.HighlightSuffix)
 	}
 	if localConfig.TimeFormat != "" {
-		a.configTimeFormat = localConfig.TimeFormat
+		a.configTimeFormat.Store(localConfig.TimeFormat)
 	}
 
-	a.history.SetMaxSize(a.configHistoryMax)
+	a.history.SetMaxSize(uint(a.configHistoryMax.Load()))
 
 	if localConfig.Data.History != nil {
 		a.history.items = localConfig.Data.History
 	}
 	if localConfig.Data.Groups != nil {
 		for name, groupData := range localConfig.Data.Groups {
-			a.groups[name] = NewGroup(name, groupData.Active, const_max_history)
+			group := NewGroup(name, groupData.Active, const_max_history)
+			group.History.SetOnChange(a.requestSave)
 			if groupData.History != nil {
-				a.groups[name].History.items = groupData.History
+				group.History.items = groupData.History
 			}
+			a.groups[name] = group
 		}
 	}
 
@@ -222,17 +231,28 @@ func (a *App) loadLocalState() {
 
 func (a *App) saveLocalState() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在保存配置和历史记录..."}
+	a.saveStateToDisk()
+}
+
+// saveLocalStateSilent 静默保存，供实时自动落盘使用，避免日志刷屏；保存失败仍会记录错误日志。
+func (a *App) saveLocalStateSilent() {
+	a.saveStateToDisk()
+}
+
+func (a *App) saveStateToDisk() {
+	a.saveMu.Lock()
+	defer a.saveMu.Unlock()
 
 	config := NewDefaultConfig()
-	config.HistoryMax = a.configHistoryMax
+	config.HistoryMax = uint(a.configHistoryMax.Load())
 	config.KeepLatestOnly = a.configKeepLatestOnly.Load()
-	config.SingleDelete = a.configSingleDelete
-	config.ImageRename = a.configImageRename
-	config.AutoRecognizeColor = a.configAutoRecognizeColor
-	config.SaveLogToLocal = a.configSaveLogToLocal
-	config.HighlightPrefix = a.configHighlightPrefix
-	config.HighlightSuffix = a.configHighlightSuffix
-	config.TimeFormat = a.configTimeFormat
+	config.SingleDelete = a.configSingleDelete.Load()
+	config.ImageRename = a.configImageRename.Load()
+	config.AutoRecognizeColor = a.configAutoRecognizeColor.Load()
+	config.SaveLogToLocal = a.configSaveLogToLocal.Load()
+	config.HighlightPrefix = a.configHighlightPrefix.Load()
+	config.HighlightSuffix = a.configHighlightSuffix.Load()
+	config.TimeFormat = a.configTimeFormat.Load()
 	config.Data.History = a.history.GetAll()
 
 	a.groupsMu.RLock()
@@ -341,7 +361,9 @@ func (a *App) shutdown() {
 		a.shareServerMu.Unlock()
 	}
 
+	a.stopStateSaver()
+
 	a.monitor.Close()
 	a.saveLocalState()
-	a.logger.FlushToFile(a.configSaveLogToLocal)
+	a.logger.FlushToFile(a.configSaveLogToLocal.Load())
 }

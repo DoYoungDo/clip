@@ -23,19 +23,22 @@ func (a *App) addCreateGroupMenuCmd() {
 		}
 
 		text := string(top.Content)
+		group := NewGroup(text, false, const_max_history)
+		group.History.SetOnChange(a.requestSave)
 		a.groupsMu.Lock()
-		a.groups[text] = NewGroup(text, false, const_max_history)
+		a.groups[text] = group
 		a.groupNames = append(a.groupNames, text)
 		a.groupsMu.Unlock()
+		a.requestSave()
 	})
 }
 
 func (a *App) renameGroup(oldName string, newName string) bool {
 	a.groupsMu.Lock()
-	defer a.groupsMu.Unlock()
 
 	group, ok := a.groups[oldName]
 	if !ok {
+		a.groupsMu.Unlock()
 		return false
 	}
 	group.Name = newName
@@ -47,14 +50,17 @@ func (a *App) renameGroup(oldName string, newName string) bool {
 			break
 		}
 	}
+	a.groupsMu.Unlock()
+
+	a.requestSave()
 	return true
 }
 
 func (a *App) deleteGroup(name string) bool {
 	a.groupsMu.Lock()
-	defer a.groupsMu.Unlock()
 
 	if _, ok := a.groups[name]; !ok {
+		a.groupsMu.Unlock()
 		return false
 	}
 	delete(a.groups, name)
@@ -65,6 +71,9 @@ func (a *App) deleteGroup(name string) bool {
 		}
 	}
 	a.groupNames = filtered
+	a.groupsMu.Unlock()
+
+	a.requestSave()
 	return true
 }
 
@@ -112,6 +121,7 @@ func (a *App) addGroupMenuAction() bool {
 				if active && syncLatestHistoryToGroup(a.history, group) {
 					global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("同步最近一条历史记录到分组 %s", group.Name)}
 				}
+				a.requestSave()
 			})
 
 			btnRename.Click(func() {

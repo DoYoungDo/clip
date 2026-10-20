@@ -16,11 +16,12 @@ func Run() {
 	monitor, err := startMonitor()
 	if err != nil {
 		application.saveLocalState()
-		logger.FlushToFile(application.configSaveLogToLocal)
+		logger.FlushToFile(application.configSaveLogToLocal.Load())
 		return
 	}
 	application.monitor = monitor
 	application.writer = monitor.writer
+	application.startStateSaver()
 
 	go application.consumeClipboardItems()
 

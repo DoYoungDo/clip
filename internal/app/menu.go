@@ -123,17 +123,17 @@ type itemMenuInfo struct {
 
 // canRenameImage 判断条目是否可重命名（图片且开启图片重命名配置）。
 func (a *App) canRenameImage(item *ClipItem) bool {
-	return item.Type == TypeImage && a.configImageRename
+	return item.Type == TypeImage && a.configImageRename.Load()
 }
 
 // buildItemMenuInfo 一次性解析条目的右键菜单能力（颜色识别/重命名/删除）。
 func (a *App) buildItemMenuInfo(item *ClipItem) itemMenuInfo {
 	info := itemMenuInfo{
 		canRename: a.canRenameImage(item),
-		hasDelete: a.configSingleDelete,
+		hasDelete: a.configSingleDelete.Load(),
 	}
 
-	if a.configAutoRecognizeColor && item.Type == TypeText {
+	if a.configAutoRecognizeColor.Load() && item.Type == TypeText {
 		if r, g, b, base, ok := getColor(string(item.Content)); ok {
 			info.hasColor = true
 			rt, _ := strconv.ParseInt(r, base, 0)
@@ -264,9 +264,9 @@ const searchHighlightMaxRunes = 16
 
 func (a *App) menuItemTitle(item *ClipItem) string {
 	if a.searchEnable && item.Type == TypeText && len([]rune(a.searchText)) <= searchHighlightMaxRunes {
-		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix, a.configHighlightSuffix), a.configTimeFormat)
+		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix.Load(), a.configHighlightSuffix.Load()), a.configTimeFormat.Load())
 	}
-	return formatMenuItemWithText(item, itemDisplayText(item), a.configTimeFormat)
+	return formatMenuItemWithText(item, itemDisplayText(item), a.configTimeFormat.Load())
 }
 
 func (a *App) addHistoryMenuAction() bool {

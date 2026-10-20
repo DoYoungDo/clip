@@ -12,6 +12,8 @@ const appDataDirName = "Clip"
 
 var legacyConfigPathOverride string
 
+var configPathOverride string
+
 func getAppDataDir() string {
 	configDir, err := os.UserConfigDir()
 	if err == nil {
@@ -38,6 +40,9 @@ func Ifel[T any](ok bool, a T, b T) T {
 }
 
 func getConfigPath() string {
+	if configPathOverride != "" {
+		return configPathOverride
+	}
 	return filepath.Join(getAppDataDir(), "config.json")
 }
 

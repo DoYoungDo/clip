@@ -76,8 +76,12 @@ func TestLoadMergedConfigMigratesLegacyConfig(t *testing.T) {
 		_ = os.Setenv("HOME", oldHome)
 		_ = os.Setenv("XDG_CONFIG_HOME", oldXdg)
 	}()
+	configPathOverride = filepath.Join(newDir, "config.json")
 	legacyConfigPathOverride = filepath.Join(legacyDir, "config.json")
-	defer func() { legacyConfigPathOverride = "" }()
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
 
 	oldWd, err := os.Getwd()
 	if err != nil {
@@ -137,8 +141,12 @@ func TestLoadMergedConfigMergesCurrentAndLegacy(t *testing.T) {
 		_ = os.Setenv("HOME", oldHome)
 		_ = os.Setenv("XDG_CONFIG_HOME", oldXdg)
 	}()
+	configPathOverride = filepath.Join(newDir, "config.json")
 	legacyConfigPathOverride = filepath.Join(legacyDir, "config.json")
-	defer func() { legacyConfigPathOverride = "" }()
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
 
 	oldWd, err := os.Getwd()
 	if err != nil {

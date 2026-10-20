@@ -38,7 +38,7 @@ func (a *App) addConfigMenuAction() {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加`配置`菜单"}
 
 	menu := systray.AddMenuItem("配置", "")
-	menu.AddSubMenuItem("设置最大历史记录条数"+fmt.Sprintf("(当前: %d/%d)", len(a.history.GetAll()), a.configHistoryMax), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
+	menu.AddSubMenuItem("设置最大历史记录条数"+fmt.Sprintf("(当前: %d/%d)", len(a.history.GetAll()), a.configHistoryMax.Load()), "【设置最大历史记录条数】会设置历史记录的最大条数，超过最大条数会自动删除最早的记录，范围：1-300").Click(func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置最大历史记录条数"}
 		top := a.history.GetTop()
 		if top == nil || top.Type != TypeText {
@@ -57,10 +57,11 @@ func (a *App) addConfigMenuAction() {
 			return
 		}
 
-		a.configHistoryMax = uint(digit)
-		a.history.SetMaxSize(a.configHistoryMax)
+		a.configHistoryMax.Store(uint32(digit))
+		a.history.SetMaxSize(uint(a.configHistoryMax.Load()))
+		a.requestSave()
 	})
-	menu.AddSubMenuItem("设置搜索高亮标记"+fmt.Sprintf("(当前: %s%s)", a.configHighlightPrefix, a.configHighlightSuffix), "【设置搜索高亮标记】复制\"前缀 后缀\"两个标记（空格分隔）后点击，设置搜索命中内容在菜单中的包裹标记").Click(func() {
+	menu.AddSubMenuItem("设置搜索高亮标记"+fmt.Sprintf("(当前: %s%s)", a.configHighlightPrefix.Load(), a.configHighlightSuffix.Load()), "【设置搜索高亮标记】复制\"前缀 后缀\"两个标记（空格分隔）后点击，设置搜索命中内容在菜单中的包裹标记").Click(func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置搜索高亮标记"}
 		top := a.history.GetTop()
 		if top == nil || top.Type != TypeText {
@@ -73,11 +74,12 @@ func (a *App) addConfigMenuAction() {
 			return
 		}
 
-		a.configHighlightPrefix = parts[0]
-		a.configHighlightSuffix = parts[1]
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索高亮标记: %s %s", a.configHighlightPrefix, a.configHighlightSuffix)}
+		a.configHighlightPrefix.Store(parts[0])
+		a.configHighlightSuffix.Store(parts[1])
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置搜索高亮标记: %s %s", a.configHighlightPrefix.Load(), a.configHighlightSuffix.Load())}
+		a.requestSave()
 	})
-	menu.AddSubMenuItem("设置时间格式"+fmt.Sprintf("(当前: %s)", a.configTimeFormat), "【设置时间格式】复制时间格式后点击，支持 YYYY YY MM DD HH mm ss 任意组合，如 YYYY-MM-DD HH:mm:ss").Click(func() {
+	menu.AddSubMenuItem("设置时间格式"+fmt.Sprintf("(当前: %s)", a.configTimeFormat.Load()), "【设置时间格式】复制时间格式后点击，支持 YYYY YY MM DD HH mm ss 任意组合，如 YYYY-MM-DD HH:mm:ss").Click(func() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: "设置时间格式"}
 		top := a.history.GetTop()
 		if top == nil || top.Type != TypeText {
@@ -90,16 +92,19 @@ func (a *App) addConfigMenuAction() {
 			return
 		}
 
-		a.configTimeFormat = format
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置时间格式: %s", a.configTimeFormat)}
+		a.configTimeFormat.Store(format)
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置时间格式: %s", a.configTimeFormat.Load())}
+		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete).Click(func() {
-		a.configSingleDelete = !a.configSingleDelete
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete)}
+	menu.AddSubMenuItemCheckbox("单独删除项", "", a.configSingleDelete.Load()).Click(func() {
+		a.configSingleDelete.Store(!a.configSingleDelete.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置单独删除项: %v", a.configSingleDelete.Load())}
+		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("自动识别颜色", "", a.configAutoRecognizeColor).Click(func() {
-		a.configAutoRecognizeColor = !a.configAutoRecognizeColor
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor)}
+	menu.AddSubMenuItemCheckbox("自动识别颜色", "", a.configAutoRecognizeColor.Load()).Click(func() {
+		a.configAutoRecognizeColor.Store(!a.configAutoRecognizeColor.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor.Load())}
+		a.requestSave()
 	})
 	menu.AddSubMenuItemCheckbox("相同内容只保留最新", "开启后相同内容的剪贴板记录只保留最近一条", a.configKeepLatestOnly.Load()).Click(func() {
 		a.configKeepLatestOnly.Store(!a.configKeepLatestOnly.Load())
@@ -113,10 +118,12 @@ func (a *App) addConfigMenuAction() {
 			a.groupsMu.RUnlock()
 			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("相同内容只保留最新已开启，清理了 %d 条重复记录", removed)}
 		}
+		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("图片重命名", "开启后可在右键菜单为图片命名，名称取自最新剪贴板文本", a.configImageRename).Click(func() {
-		a.configImageRename = !a.configImageRename
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置图片重命名: %v", a.configImageRename)}
+	menu.AddSubMenuItemCheckbox("图片重命名", "开启后可在右键菜单为图片命名，名称取自最新剪贴板文本", a.configImageRename.Load()).Click(func() {
+		a.configImageRename.Store(!a.configImageRename.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置图片重命名: %v", a.configImageRename.Load())}
+		a.requestSave()
 	})
 
 	shareMenu := menu.AddSubMenuItem("局域网共享", "")
@@ -220,6 +227,7 @@ func (a *App) addConfigMenuAction() {
 			for _, lang := range translator.TransLangFactory() {
 				langMenu.AddSubMenuItemCheckbox(string(lang), "", currentLang == lang).Click(func() {
 					a.setTranslateToLang(lang)
+					a.requestSave()
 				})
 			}
 		}
@@ -243,6 +251,7 @@ func (a *App) addConfigMenuAction() {
 						}
 						translatorImp.Disable()
 						global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已删除翻译器 %s 的密钥", translatorImp.Name())}
+						a.requestSave()
 					})
 				}
 			}
@@ -255,6 +264,7 @@ func (a *App) addConfigMenuAction() {
 			transLateMenu.AddSubMenuItemCheckbox(translatorName, "", a.currentTranslator() == translatorImp).Click(func() {
 				if a.currentTranslator() == translatorImp && translatorImp.IsEnabled() {
 					a.setTranslator(nil)
+					a.requestSave()
 					return
 				}
 
@@ -264,6 +274,7 @@ func (a *App) addConfigMenuAction() {
 				}
 				if translatorImp.IsEnabled() || translatorImp.Enable(string(top.Content)) {
 					a.setTranslator(translatorImp)
+					a.requestSave()
 				}
 			})
 		}
@@ -272,9 +283,10 @@ func (a *App) addConfigMenuAction() {
 	menu.AddSubMenuItem("打开配置文件目录", "").Click(func() {
 		openDir(getAppDataDir())
 	})
-	menu.AddSubMenuItemCheckbox("退出时保存日志", "", a.configSaveLogToLocal).Click(func() {
-		a.configSaveLogToLocal = !a.configSaveLogToLocal
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", a.configSaveLogToLocal)}
+	menu.AddSubMenuItemCheckbox("退出时保存日志", "", a.configSaveLogToLocal.Load()).Click(func() {
+		a.configSaveLogToLocal.Store(!a.configSaveLogToLocal.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置退出时保存日志: %v", a.configSaveLogToLocal.Load())}
+		a.requestSave()
 	})
 }
 

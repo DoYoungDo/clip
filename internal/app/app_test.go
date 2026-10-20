@@ -536,8 +536,12 @@ func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
 
 	t.Setenv("HOME", tempDir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempDir, "xdg"))
+	configPathOverride = filepath.Join(tempDir, "config.json")
 	legacyConfigPathOverride = filepath.Join(legacyDir, "config.json")
-	defer func() { legacyConfigPathOverride = "" }()
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
 
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())
@@ -571,13 +575,13 @@ func TestBuildItemMenuInfo(t *testing.T) {
 		t.Fatalf("默认配置下不应有子菜单")
 	}
 
-	app.configSingleDelete = true
+	app.configSingleDelete.Store(true)
 	if info := app.buildItemMenuInfo(plainText); !info.hasSub || !info.hasDelete {
 		t.Fatalf("开启单独删除后所有条目应有子菜单")
 	}
-	app.configSingleDelete = false
+	app.configSingleDelete.Store(false)
 
-	app.configAutoRecognizeColor = true
+	app.configAutoRecognizeColor.Store(true)
 	if info := app.buildItemMenuInfo(colorText); !info.hasColor || !info.hasSub || info.colorHex != "#aabbcc" || info.colorRGB != "170,187,204" {
 		t.Fatalf("颜色文本应命中颜色识别: %+v", info)
 	}
@@ -587,9 +591,9 @@ func TestBuildItemMenuInfo(t *testing.T) {
 	if info := app.buildItemMenuInfo(image); info.hasColor {
 		t.Fatalf("图片不应命中颜色识别")
 	}
-	app.configAutoRecognizeColor = false
+	app.configAutoRecognizeColor.Store(false)
 
-	app.configImageRename = true
+	app.configImageRename.Store(true)
 	if info := app.buildItemMenuInfo(image); !info.canRename || !info.hasSub {
 		t.Fatalf("开启图片重命名后图片应有子菜单")
 	}

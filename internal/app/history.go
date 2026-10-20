@@ -125,15 +125,32 @@ func (c *ClipItem) Clone() *ClipItem {
 }
 
 type History struct {
-	items   []*ClipItem
-	maxSize uint
-	mu      sync.RWMutex
+	items    []*ClipItem
+	maxSize  uint
+	mu       sync.RWMutex
+	onChange func()
 }
 
 func NewHistory(maxSize uint) *History {
 	return &History{
 		items:   []*ClipItem{},
 		maxSize: maxSize,
+	}
+}
+
+// SetOnChange 注册历史内容变更回调，回调在锁外执行。
+func (h *History) SetOnChange(fn func()) {
+	h.mu.Lock()
+	h.onChange = fn
+	h.mu.Unlock()
+}
+
+func (h *History) notifyChange() {
+	h.mu.RLock()
+	fn := h.onChange
+	h.mu.RUnlock()
+	if fn != nil {
+		fn()
 	}
 }
 
@@ -186,13 +203,13 @@ func (h *History) add(item *ClipItem, keepLatest bool) bool {
 	if removed > 0 {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已移除 %d 条相同内容的旧历史记录", removed)}
 	}
+	h.notifyChange()
 	return true
 }
 
 // RemoveDuplicates 对当前历史做一次相同内容去重，每条内容只保留最新的那条。
 func (h *History) RemoveDuplicates() int {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	seen := make(map[string]bool, len(h.items))
 	filtered := make([]*ClipItem, 0, len(h.items))
@@ -210,6 +227,11 @@ func (h *History) RemoveDuplicates() int {
 
 	removed := len(h.items) - len(filtered)
 	h.items = filtered
+	h.mu.Unlock()
+
+	if removed > 0 {
+		h.notifyChange()
+	}
 	return removed
 }
 
@@ -220,17 +242,23 @@ func (h *History) Rename(item *ClipItem, name string) bool {
 	}
 
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
+	renamed := false
 	for i, existing := range h.items {
 		if existing == item {
-			renamed := item.Clone()
-			renamed.Name = name
-			h.items[i] = renamed
-			return true
+			replacement := item.Clone()
+			replacement.Name = name
+			h.items[i] = replacement
+			renamed = true
+			break
 		}
 	}
-	return false
+	h.mu.Unlock()
+
+	if renamed {
+		h.notifyChange()
+	}
+	return renamed
 }
 
 // NameByHash 返回历史中指定哈希图片项的自定义名称。
@@ -271,9 +299,13 @@ func (h *History) GetTop() *ClipItem {
 
 func (h *History) Clear() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
+	changed := len(h.items) > 0
 	h.items = []*ClipItem{}
+	h.mu.Unlock()
+
+	if changed {
+		h.notifyChange()
+	}
 }
 
 func (h *History) Delete(item *ClipItem) bool {
@@ -299,6 +331,7 @@ func (h *History) Delete(item *ClipItem) bool {
 	}
 
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在删除历史记录..."}
+	h.notifyChange()
 	return true
 }
 
@@ -313,6 +346,7 @@ func (h *History) SetMaxSize(max uint) {
 
 	if truncated {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("历史记录超过新设置的最大值%d，正在删除多余的记录...", max)}
+		h.notifyChange()
 	}
 }
 
