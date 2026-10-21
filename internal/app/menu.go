@@ -329,6 +329,7 @@ func (a *App) hasGroupMenuItems() bool {
 func (a *App) addHistoryMenuAction() bool {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: "添加历史记录项"}
 	all := a.history.GetAll()
+	moveToGroup := a.showMenuState == RClick && a.canMoveToGroup()
 	for _, item := range all {
 		if !a.matchSearch(item) {
 			continue
@@ -336,7 +337,7 @@ func (a *App) addHistoryMenuAction() bool {
 
 		var info itemMenuInfo
 		if a.showMenuState == RClick {
-			info = a.buildItemMenuInfo(item, a.canMoveToGroup())
+			info = a.buildItemMenuInfo(item, moveToGroup)
 		}
 		menu := systray.AddMenuItem(a.menuItemTitle(item), itemMenuTooltip(item, info))
 		switch a.showMenuState {
