@@ -116,7 +116,7 @@ Common locations:
 - `save_log_to_local`: Save logs on exit
 - `highlight_prefix` / `highlight_suffix`: Characters wrapping search matches, defaults to 【 and 】
 - `time_format`: Entry time display format, any combination of YYYY YY MM DD HH mm ss, default hh:mm
-- `translator_data.lang`: Translation target language
+- `translator_data.lang`: Translation target language, defaults to zh
 - `translator_data.current_translator_id`: Currently enabled translator
 - `translator_data.inited_translators`: Initialized translator list (ids only)
 

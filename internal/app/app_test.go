@@ -575,6 +575,36 @@ func TestAddItemToHistoryInheritsImageName(t *testing.T) {
 	}
 }
 
+func TestTranslateLangDefaultsToZH(t *testing.T) {
+	app := NewApp(NewAppLogger())
+	if app.currentTranslateToLang() != translator.ZH {
+		t.Fatalf("默认翻译语言应为 zh，实际 %q", app.currentTranslateToLang())
+	}
+
+	tempDir := t.TempDir()
+	configPathOverride = filepath.Join(tempDir, "config.json")
+	legacyConfigPathOverride = filepath.Join(tempDir, "legacy-config.json")
+	defer func() {
+		configPathOverride = ""
+		legacyConfigPathOverride = ""
+	}()
+
+	resetTestLogChannel()
+	app2 := NewApp(NewAppLogger())
+	app2.loadLocalState()
+	if app2.currentTranslateToLang() != translator.ZH {
+		t.Fatalf("无翻译配置时默认语言应保持 zh，实际 %q", app2.currentTranslateToLang())
+	}
+
+	app2.setTranslateToLang(translator.EN)
+	app2.saveLocalState()
+	reloaded := NewApp(NewAppLogger())
+	reloaded.loadLocalState()
+	if reloaded.currentTranslateToLang() != translator.EN {
+		t.Fatalf("已保存的语言应恢复为 en，实际 %q", reloaded.currentTranslateToLang())
+	}
+}
+
 func TestSaveLoadLocalStatePersistsImageName(t *testing.T) {
 	tempDir := t.TempDir()
 	legacyDir := filepath.Join(tempDir, "legacy")

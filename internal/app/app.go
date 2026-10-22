@@ -71,6 +71,7 @@ func NewApp(logger *AppLogger) *App {
 	app.configHighlightPrefix.Store(defaultHighlightPrefix)
 	app.configHighlightSuffix.Store(defaultHighlightSuffix)
 	app.configTimeFormat.Store(defaultTimeFormat)
+	app.setTranslateToLang(translator.ZH)
 	app.history = NewHistory(uint(app.configHistoryMax.Load()))
 	app.history.SetOnChange(app.requestSave)
 	return app
@@ -202,7 +203,9 @@ func (a *App) loadLocalState() {
 
 	{
 		if localConfig.Translator != nil {
-			a.setTranslateToLang(translator.TransLang(localConfig.Translator.Lang))
+			if localConfig.Translator.Lang != "" {
+				a.setTranslateToLang(translator.TransLang(localConfig.Translator.Lang))
+			}
 			currentTranslatorID := ""
 			if localConfig.Translator.CurrentTranslatorId != nil {
 				currentTranslatorID = *localConfig.Translator.CurrentTranslatorId

@@ -116,7 +116,7 @@
 - `save_log_to_local`: 退出時保存日誌
 - `highlight_prefix` / `highlight_suffix`: 搜尋高亮標記前後字元，預設 【 和 】
 - `time_format`: 條目時間顯示格式，支援 YYYY YY MM DD HH mm ss 任意組合，預設 hh:mm
-- `translator_data.lang`: 翻譯目標語言
+- `translator_data.lang`: 翻譯目標語言，預設 zh
 - `translator_data.current_translator_id`: 目前啟用的翻譯器
 - `translator_data.inited_translators`: 已初始化翻譯器列表（僅保存 id）
 
