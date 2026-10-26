@@ -145,9 +145,9 @@ func (a *App) addConfigMenuAction() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置置顶【搜索】菜单: %v", a.configSearchMenuTop.Load())}
 		a.requestSave()
 	})
-	menu.AddSubMenuItemCheckbox("移动到分组", "开启后右键历史记录可将其移动到指定分组", a.configMoveToGroup.Load()).Click(func() {
-		a.configMoveToGroup.Store(!a.configMoveToGroup.Load())
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置移动到分组: %v", a.configMoveToGroup.Load())}
+	menu.AddSubMenuItemCheckbox("添加到分组", "开启后右键历史记录可将其添加到指定分组", a.configAddToGroup.Load()).Click(func() {
+		a.configAddToGroup.Store(!a.configAddToGroup.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置添加到分组: %v", a.configAddToGroup.Load())}
 		a.requestSave()
 	})
 

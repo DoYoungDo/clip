@@ -716,8 +716,8 @@ func TestBuildItemMenuInfo(t *testing.T) {
 		t.Fatalf("默认配置下不应有子菜单")
 	}
 
-	if info := app.buildItemMenuInfo(plainText, true); !info.hasMove || !info.hasSub {
-		t.Fatalf("主历史条目应显示移动到分组子菜单")
+	if info := app.buildItemMenuInfo(plainText, true); !info.hasAdd || !info.hasSub {
+		t.Fatalf("主历史条目应显示添加到分组子菜单")
 	}
 
 	app.configSingleDelete.Store(true)
@@ -747,72 +747,75 @@ func TestBuildItemMenuInfo(t *testing.T) {
 	}
 }
 
-func TestCanMoveToGroup(t *testing.T) {
+func TestCanAddToGroup(t *testing.T) {
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())
 
-	if app.canMoveToGroup() {
-		t.Fatalf("默认配置下不应启用移动到分组")
+	if app.canAddToGroup() {
+		t.Fatalf("默认配置下不应启用添加到分组")
 	}
 
-	app.configMoveToGroup.Store(true)
-	if app.canMoveToGroup() {
-		t.Fatalf("无分组时不应显示移动到分组")
+	app.configAddToGroup.Store(true)
+	if app.canAddToGroup() {
+		t.Fatalf("无分组时不应显示添加到分组")
 	}
 
 	group := NewGroup("g", false, 10)
 	app.groups["g"] = group
 	app.groupNames = []string{"g"}
-	if !app.canMoveToGroup() {
-		t.Fatalf("开启配置且存在分组时应显示移动到分组")
+	if !app.canAddToGroup() {
+		t.Fatalf("开启配置且存在分组时应显示添加到分组")
 	}
 
-	app.configMoveToGroup.Store(false)
-	if app.canMoveToGroup() {
-		t.Fatalf("关闭配置后不应显示移动到分组")
+	app.configAddToGroup.Store(false)
+	if app.canAddToGroup() {
+		t.Fatalf("关闭配置后不应显示添加到分组")
 	}
 }
 
-func TestMoveItemToGroup(t *testing.T) {
+func TestAddItemToGroup(t *testing.T) {
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())
 	group := NewGroup("目标分组", false, 10)
 	app.groups["目标分组"] = group
 	app.groupNames = []string{"目标分组"}
 
-	item := NewClipItem(TypeText, []byte("move-me"))
+	item := NewClipItem(TypeText, []byte("add-me"))
 	app.history.Add(item)
 
-	app.moveItemToGroup(item, group)
+	app.addItemToGroup(item, group)
 
-	if got := len(app.history.GetAll()); got != 0 {
-		t.Fatalf("主历史应移除被移动条目，实际剩余 %d 条", got)
+	if got := len(app.history.GetAll()); got != 1 {
+		t.Fatalf("主历史应保留被添加条目，实际剩余 %d 条", got)
+	}
+	if app.history.GetTop() != item {
+		t.Fatalf("主历史条目指针不应被替换")
 	}
 	top := group.History.GetTop()
-	if top == nil || string(top.Content) != "move-me" {
-		t.Fatalf("目标分组顶部应为被移动条目，实际 %#v", top)
+	if top == nil || string(top.Content) != "add-me" {
+		t.Fatalf("目标分组顶部应为被添加条目，实际 %#v", top)
 	}
 }
 
-func TestMoveItemToGroupHandlesInvalidInput(t *testing.T) {
+func TestAddItemToGroupHandlesInvalidInput(t *testing.T) {
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())
 	group := NewGroup("g", false, 10)
 	item := NewClipItem(TypeText, []byte("x"))
 	app.history.Add(item)
 
-	app.moveItemToGroup(nil, group)
-	app.moveItemToGroup(item, nil)
+	app.addItemToGroup(nil, group)
+	app.addItemToGroup(item, nil)
 
 	if len(app.history.GetAll()) != 1 {
-		t.Fatalf("非法参数不应移除主历史条目")
+		t.Fatalf("非法参数不应影响主历史条目")
 	}
 	if len(group.History.GetAll()) != 0 {
 		t.Fatalf("非法参数不应向分组添加条目")
 	}
 }
 
-func TestSaveLoadLocalStatePersistsMoveToGroup(t *testing.T) {
+func TestSaveLoadLocalStatePersistsAddToGroup(t *testing.T) {
 	tempDir := t.TempDir()
 	configPathOverride = filepath.Join(tempDir, "config.json")
 	legacyConfigPathOverride = filepath.Join(tempDir, "legacy-config.json")
@@ -823,12 +826,12 @@ func TestSaveLoadLocalStatePersistsMoveToGroup(t *testing.T) {
 
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())
-	app.configMoveToGroup.Store(true)
+	app.configAddToGroup.Store(true)
 	app.saveLocalState()
 
 	reloaded := NewApp(NewAppLogger())
 	reloaded.loadLocalState()
-	if !reloaded.configMoveToGroup.Load() {
-		t.Fatalf("移动到分组配置应持久化")
+	if !reloaded.configAddToGroup.Load() {
+		t.Fatalf("添加到分组配置应持久化")
 	}
 }

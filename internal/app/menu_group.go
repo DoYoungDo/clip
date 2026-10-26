@@ -174,9 +174,9 @@ func (a *App) addGroupMenuAction() bool {
 	return addedGroups > 0
 }
 
-// canMoveToGroup 判断是否显示“移动到分组”：配置开启且存在分组。
-func (a *App) canMoveToGroup() bool {
-	if !a.configMoveToGroup.Load() {
+// canAddToGroup 判断是否显示“添加到分组”：配置开启且存在分组。
+func (a *App) canAddToGroup() bool {
+	if !a.configAddToGroup.Load() {
 		return false
 	}
 
@@ -191,8 +191,8 @@ func (a *App) canMoveToGroup() bool {
 	return false
 }
 
-// addMoveToGroupMenuItems 添加“移动到分组”子菜单，列出全部分组。
-func (a *App) addMoveToGroupMenuItems(menu *systray.MenuItem, item *ClipItem) {
+// addItemToGroupMenuItems 添加“添加到分组”子菜单，列出全部分组。
+func (a *App) addItemToGroupMenuItems(menu *systray.MenuItem, item *ClipItem) {
 	a.groupsMu.RLock()
 	names := append([]string(nil), a.groupNames...)
 	groups := make(map[string]*Group, len(names))
@@ -201,28 +201,27 @@ func (a *App) addMoveToGroupMenuItems(menu *systray.MenuItem, item *ClipItem) {
 	}
 	a.groupsMu.RUnlock()
 
-	moveMenu := menu.AddSubMenuItem("移动到分组", "")
+	addMenu := menu.AddSubMenuItem("添加到分组", "")
 	for _, name := range names {
 		group := groups[name]
 		if group == nil {
 			continue
 		}
 		target := group
-		moveMenu.AddSubMenuItem(name, "").Click(func() {
-			a.moveItemToGroup(item, target)
+		addMenu.AddSubMenuItem(name, "").Click(func() {
+			a.addItemToGroup(item, target)
 		})
 	}
 }
 
-// moveItemToGroup 将主历史条目移动到目标分组顶部。
-func (a *App) moveItemToGroup(item *ClipItem, group *Group) {
+// addItemToGroup 将主历史条目添加到目标分组顶部，主历史保留。
+func (a *App) addItemToGroup(item *ClipItem, group *Group) {
 	if item == nil || group == nil || group.History == nil {
 		return
 	}
 
-	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("移动历史记录到分组 %s: %s", group.Name, formatMenuItem(item))}
-	a.addItemToHistory(group.History, item.Clone())
-	if a.history.Delete(item) {
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已移动到分组 %s", group.Name)}
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("添加历史记录到分组 %s: %s", group.Name, formatMenuItem(item))}
+	if a.addItemToHistory(group.History, item.Clone()) {
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("已添加到分组 %s", group.Name)}
 	}
 }

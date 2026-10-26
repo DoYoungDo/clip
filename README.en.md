@@ -111,7 +111,7 @@ Common locations:
 - `confirm_clear_history`: Clear history without confirmation (off by default; clearing requires a second confirmation)
 - `single_delete`: Enable single-entry deletion
 - `search_menu_top`: Pin the Search menu to the top
-- `move_to_group`: Move entries to groups
+- `add_to_group`: Add entries to groups
 - `auto_recognize_color`: Auto recognize colors
 - `save_log_to_local`: Save logs on exit
 - `highlight_prefix` / `highlight_suffix`: Characters wrapping search matches, defaults to 【 and 】

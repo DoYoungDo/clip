@@ -111,7 +111,7 @@
 - `confirm_clear_history`: 清空歷史時不詢問（開關預設關閉，點擊清空需二次確認）
 - `single_delete`: 啟用單條刪除
 - `search_menu_top`: 置頂【搜尋】選單
-- `move_to_group`: 移動到分組
+- `add_to_group`: 新增至分組
 - `auto_recognize_color`: 自動識別顏色
 - `save_log_to_local`: 退出時保存日誌
 - `highlight_prefix` / `highlight_suffix`: 搜尋高亮標記前後字元，預設 【 和 】

@@ -38,7 +38,7 @@ type App struct {
 	configSingleDelete        atomic.Bool
 	configSearchMenuTop       atomic.Bool
 	configImageRename         atomic.Bool
-	configMoveToGroup         atomic.Bool
+	configAddToGroup          atomic.Bool
 	configAutoRecognizeColor  atomic.Bool
 	configSaveLogToLocal      atomic.Bool
 
@@ -170,7 +170,7 @@ func (a *App) loadLocalState() {
 	a.configSingleDelete.Store(localConfig.SingleDelete)
 	a.configSearchMenuTop.Store(localConfig.SearchMenuTop)
 	a.configImageRename.Store(localConfig.ImageRename)
-	a.configMoveToGroup.Store(localConfig.MoveToGroup)
+	a.configAddToGroup.Store(localConfig.AddToGroup)
 	a.configAutoRecognizeColor.Store(localConfig.AutoRecognizeColor)
 	a.configSaveLogToLocal.Store(localConfig.SaveLogToLocal)
 	if localConfig.HighlightPrefix != "" {
@@ -259,7 +259,7 @@ func (a *App) saveStateToDisk() {
 	config.SingleDelete = a.configSingleDelete.Load()
 	config.SearchMenuTop = a.configSearchMenuTop.Load()
 	config.ImageRename = a.configImageRename.Load()
-	config.MoveToGroup = a.configMoveToGroup.Load()
+	config.AddToGroup = a.configAddToGroup.Load()
 	config.AutoRecognizeColor = a.configAutoRecognizeColor.Load()
 	config.SaveLogToLocal = a.configSaveLogToLocal.Load()
 	config.HighlightPrefix = a.configHighlightPrefix.Load()
