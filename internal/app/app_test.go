@@ -727,8 +727,8 @@ func TestBuildItemMenuInfo(t *testing.T) {
 	app.configSingleDelete.Store(false)
 
 	app.configAutoRecognizeColor.Store(true)
-	if info := app.buildItemMenuInfo(colorText, false); !info.hasColor || !info.hasSub || info.colorHex != "#aabbcc" || info.colorRGB != "170,187,204" {
-		t.Fatalf("颜色文本应命中颜色识别: %+v", info)
+	if info := app.buildItemMenuInfo(colorText, false); !info.hasColor || !info.hasSub || info.colorHex != "#aabbcc" || info.colorRGB != "170,187,204" || info.colorR != "170" || info.colorG != "187" || info.colorB != "204" {
+		t.Fatalf("颜色文本应命中颜色识别并解析出R/G/B值: %+v", info)
 	}
 	if info := app.buildItemMenuInfo(plainText, false); info.hasColor || info.hasSub {
 		t.Fatalf("非颜色文本不应命中颜色识别")
@@ -744,6 +744,35 @@ func TestBuildItemMenuInfo(t *testing.T) {
 	}
 	if info := app.buildItemMenuInfo(plainText, false); info.canRename {
 		t.Fatalf("文本不应有重命名子菜单")
+	}
+}
+
+func TestBuildItemMenuInfoColorChannels(t *testing.T) {
+	app := NewApp(NewAppLogger())
+	app.configAutoRecognizeColor.Store(true)
+
+	cases := []struct {
+		text string
+		r    string
+		g    string
+		b    string
+	}{
+		{"#aabbcc", "170", "187", "204"},
+		{"#FF5733", "255", "87", "51"},
+		{"12, 34, 56", "12", "34", "56"},
+		{"12,34,56,78", "12", "34", "56"},
+	}
+	for _, c := range cases {
+		info := app.buildItemMenuInfo(NewClipItem(TypeText, []byte(c.text)), false)
+		if !info.hasColor || info.colorR != c.r || info.colorG != c.g || info.colorB != c.b {
+			t.Fatalf("颜色 %q 应解析出单独R/G/B值: %+v", c.text, info)
+		}
+	}
+
+	app.configAutoRecognizeColor.Store(false)
+	info := app.buildItemMenuInfo(NewClipItem(TypeText, []byte("#aabbcc")), false)
+	if info.hasColor || info.colorR != "" || info.colorG != "" || info.colorB != "" {
+		t.Fatalf("未开启自动识别颜色时不应解析R/G/B值: %+v", info)
 	}
 }
 
