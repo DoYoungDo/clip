@@ -346,7 +346,7 @@ const searchHighlightMaxRunes = 16
 
 func (a *App) menuItemTitle(item *ClipItem) string {
 	if a.searchEnable && item.Type == TypeText && len([]rune(a.searchText)) <= searchHighlightMaxRunes {
-		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxRunes, a.configHighlightPrefix.Load(), a.configHighlightSuffix.Load()), a.configTimeFormat.Load())
+		return formatMenuItemWithText(item, highlightTruncate(string(item.Content), a.searchText, menuTextMaxWidth, a.configHighlightPrefix.Load(), a.configHighlightSuffix.Load()), a.configTimeFormat.Load())
 	}
 	return formatMenuItemWithText(item, itemDisplayText(item), a.configTimeFormat.Load())
 }
