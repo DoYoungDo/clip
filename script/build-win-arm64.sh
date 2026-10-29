@@ -28,13 +28,13 @@ if [ -f "$SCRIPT_DIR/icon.ico" ]; then
         # 生成 Windows 资源文件（syso 必须与入口包同目录才会被链接）
         trap 'rm -f "$ROOT_DIR/cmd/clip/rsrc.syso"' EXIT
         (cd "$ROOT_DIR" && rsrc -arch arm64 -ico "$SCRIPT_DIR/icon.ico" -o cmd/clip/rsrc.syso)
-        (cd "$ROOT_DIR" && GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-arm64.exe" ./cmd/clip)
+        (cd "$ROOT_DIR" && CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-arm64.exe" ./cmd/clip)
     else
         echo "警告: rsrc 工具安装失败，跳过图标嵌入"
-        (cd "$ROOT_DIR" && GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-arm64.exe" ./cmd/clip)
+        (cd "$ROOT_DIR" && CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-arm64.exe" ./cmd/clip)
     fi
 else
-    (cd "$ROOT_DIR" && GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-arm64.exe" ./cmd/clip)
+    (cd "$ROOT_DIR" && CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION -H=windowsgui" -o "$BUILD_DIR/${APP_NAME}-windows-arm64.exe" ./cmd/clip)
 fi
 
 echo "Windows ARM64 编译完成: $BUILD_DIR/${APP_NAME}-windows-arm64.exe"

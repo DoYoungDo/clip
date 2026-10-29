@@ -15,7 +15,7 @@ APP_VERSION="$(git -C "$ROOT_DIR" describe --tags --always --dirty 2>/dev/null |
 mkdir -p "$BUILD_DIR"
 
 echo "编译 Linux ARM64..."
-(cd "$ROOT_DIR" && GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION" -o "$BUILD_DIR/${APP_NAME}-linux-arm64" ./cmd/clip)
+(cd "$ROOT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X clip/internal/app.version=$APP_VERSION" -o "$BUILD_DIR/${APP_NAME}-linux-arm64" ./cmd/clip)
 
 # 创建 desktop 文件和图标
 if [ -f "$SCRIPT_DIR/icon.png" ]; then
