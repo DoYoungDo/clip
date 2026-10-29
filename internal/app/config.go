@@ -39,6 +39,7 @@ type Config struct {
 	ImageRename         bool            `json:"image_rename"`
 	AddToGroup          bool            `json:"add_to_group"`
 	AutoRecognizeColor  bool            `json:"auto_recognize_color"`
+	BaseConvert         bool            `json:"base_convert"`
 	SaveLogToLocal      bool            `json:"save_log_to_local"`
 	HighlightPrefix     string          `json:"highlight_prefix"`
 	HighlightSuffix     string          `json:"highlight_suffix"`
@@ -57,6 +58,7 @@ func NewDefaultConfig() *Config {
 		ImageRename:         false,
 		AddToGroup:          false,
 		AutoRecognizeColor:  false,
+		BaseConvert:         false,
 		SaveLogToLocal:      false,
 		HighlightPrefix:     defaultHighlightPrefix,
 		HighlightSuffix:     defaultHighlightSuffix,

@@ -40,6 +40,7 @@ type App struct {
 	configImageRename         atomic.Bool
 	configAddToGroup          atomic.Bool
 	configAutoRecognizeColor  atomic.Bool
+	configBaseConvert         atomic.Bool
 	configSaveLogToLocal      atomic.Bool
 
 	configHighlightPrefix atomicString
@@ -172,6 +173,7 @@ func (a *App) loadLocalState() {
 	a.configImageRename.Store(localConfig.ImageRename)
 	a.configAddToGroup.Store(localConfig.AddToGroup)
 	a.configAutoRecognizeColor.Store(localConfig.AutoRecognizeColor)
+	a.configBaseConvert.Store(localConfig.BaseConvert)
 	a.configSaveLogToLocal.Store(localConfig.SaveLogToLocal)
 	if localConfig.HighlightPrefix != "" {
 		a.configHighlightPrefix.Store(localConfig.HighlightPrefix)
@@ -261,6 +263,7 @@ func (a *App) saveStateToDisk() {
 	config.ImageRename = a.configImageRename.Load()
 	config.AddToGroup = a.configAddToGroup.Load()
 	config.AutoRecognizeColor = a.configAutoRecognizeColor.Load()
+	config.BaseConvert = a.configBaseConvert.Load()
 	config.SaveLogToLocal = a.configSaveLogToLocal.Load()
 	config.HighlightPrefix = a.configHighlightPrefix.Load()
 	config.HighlightSuffix = a.configHighlightSuffix.Load()

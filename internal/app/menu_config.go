@@ -121,6 +121,11 @@ func (a *App) addConfigMenuAction() {
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置自动识别颜色: %v", a.configAutoRecognizeColor.Load())}
 		a.requestSave()
 	})
+	menu.AddSubMenuItemCheckbox("进制转换", "开启后自动识别数字，右键条目可转换二/八/十/十六进制（支持 0b/0o/0x 前缀，无前缀数字按十进制）", a.configBaseConvert.Load()).Click(func() {
+		a.configBaseConvert.Store(!a.configBaseConvert.Load())
+		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置进制转换: %v", a.configBaseConvert.Load())}
+		a.requestSave()
+	})
 	menu.AddSubMenuItemCheckbox("相同内容只保留最新", "开启后相同内容的剪贴板记录只保留最近一条", a.configKeepLatestOnly.Load()).Click(func() {
 		a.configKeepLatestOnly.Store(!a.configKeepLatestOnly.Load())
 		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("设置相同内容只保留最新: %v", a.configKeepLatestOnly.Load())}

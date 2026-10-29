@@ -131,6 +131,12 @@ func addAboutMenuCmd() {
 	})
 }
 
+// baseConvertItem 描述一个目标进制及其转换结果。
+type baseConvertItem struct {
+	name  string
+	value string
+}
+
 // itemMenuInfo 是条目右键菜单的能力快照，单次解析避免重复计算。
 type itemMenuInfo struct {
 	canRename bool
@@ -143,6 +149,7 @@ type itemMenuInfo struct {
 	colorR    string
 	colorG    string
 	colorB    string
+	baseItems []baseConvertItem
 }
 
 // canRenameImage 判断条目是否可重命名（图片且开启图片重命名配置）。
@@ -172,7 +179,29 @@ func (a *App) buildItemMenuInfo(item *ClipItem, hasAdd bool) itemMenuInfo {
 		}
 	}
 
-	info.hasSub = info.canRename || info.hasColor || info.hasDelete || info.hasAdd
+	if a.configBaseConvert.Load() && item.Type == TypeText {
+		if value, base, ok := parseBaseNumber(string(item.Content)); ok {
+			for _, target := range []struct {
+				name string
+				base int
+			}{
+				{"二进制", 2},
+				{"八进制", 8},
+				{"十进制", 10},
+				{"十六进制", 16},
+			} {
+				if target.base == base {
+					continue
+				}
+				info.baseItems = append(info.baseItems, baseConvertItem{
+					name:  target.name,
+					value: formatBaseValue(value, target.base),
+				})
+			}
+		}
+	}
+
+	info.hasSub = info.canRename || info.hasColor || info.hasDelete || info.hasAdd || len(info.baseItems) > 0
 	return info
 }
 
@@ -215,6 +244,19 @@ func (a *App) addColorRecognizeMenuItems(menu *systray.MenuItem, item *ClipItem,
 	}
 }
 
+// addBaseConvertMenuItems 添加"复制二进制: xxx"等进制转换子菜单（转换结果来自已解析的 info）。
+func (a *App) addBaseConvertMenuItems(menu *systray.MenuItem, item *ClipItem, info itemMenuInfo) {
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("识别数字成功: %s,并添加菜单", string(item.Content))}
+
+	for _, c := range info.baseItems {
+		copyItem := menu.AddSubMenuItem(fmt.Sprintf("复制%s: %s", c.name, c.value), "")
+		copyItem.Click(func() {
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制%s: %s", c.name, c.value)}
+			a.writer <- NewClipItem(TypeText, []byte(c.value))
+		})
+	}
+}
+
 func (a *App) addCopyMenuItem(menu *systray.MenuItem, item *ClipItem, logPrefix string, tooltip string) {
 	copyItem := menu.AddSubMenuItem("复制", tooltip)
 	copyItem.Click(func() {
@@ -231,7 +273,7 @@ func (a *App) addDeleteMenuItem(menu *systray.MenuItem, item *ClipItem, logPrefi
 	})
 }
 
-// addItemSubMenu 构建右键二级菜单，顺序为：复制（最高优先级，承载悬浮提示）→ 颜色识别 → 重命名 → 删除。
+// addItemSubMenu 构建右键二级菜单，顺序为：复制（最高优先级，承载悬浮提示）→ 添加到分组 → 颜色识别 → 进制转换 → 重命名 → 删除。
 // 返回是否添加了任何子菜单。
 func (a *App) addItemSubMenu(menu *systray.MenuItem, item *ClipItem, h *History, logPrefix string, info itemMenuInfo) bool {
 	if !info.hasSub {
@@ -244,6 +286,9 @@ func (a *App) addItemSubMenu(menu *systray.MenuItem, item *ClipItem, h *History,
 	}
 	if info.hasColor {
 		a.addColorRecognizeMenuItems(menu, item, info)
+	}
+	if len(info.baseItems) > 0 {
+		a.addBaseConvertMenuItems(menu, item, info)
 	}
 	if info.canRename {
 		rename := menu.AddSubMenuItem("重命名", "使用最新剪贴板内容作为新名称")

@@ -776,6 +776,61 @@ func TestBuildItemMenuInfoColorChannels(t *testing.T) {
 	}
 }
 
+func TestBuildItemMenuInfoBaseConvert(t *testing.T) {
+	app := NewApp(NewAppLogger())
+	app.configBaseConvert.Store(true)
+
+	decimal := app.buildItemMenuInfo(NewClipItem(TypeText, []byte("255")), false)
+	wantDecimal := []baseConvertItem{
+		{"二进制", "0b11111111"},
+		{"八进制", "0o377"},
+		{"十六进制", "0xFF"},
+	}
+	if !decimal.hasSub || len(decimal.baseItems) != len(wantDecimal) {
+		t.Fatalf("十进制数字应生成3个转换项且有子菜单: %+v", decimal)
+	}
+	for i, want := range wantDecimal {
+		if decimal.baseItems[i] != want {
+			t.Fatalf("十进制数字转换项错误: %+v", decimal.baseItems)
+		}
+	}
+
+	hex := app.buildItemMenuInfo(NewClipItem(TypeText, []byte("0xFF")), false)
+	if len(hex.baseItems) != 3 || hex.baseItems[0].name != "二进制" || hex.baseItems[0].value != "0b11111111" ||
+		hex.baseItems[1].name != "八进制" || hex.baseItems[1].value != "0o377" ||
+		hex.baseItems[2].name != "十进制" || hex.baseItems[2].value != "255" {
+		t.Fatalf("十六进制数字应转换为其他三种进制: %+v", hex.baseItems)
+	}
+
+	bin := app.buildItemMenuInfo(NewClipItem(TypeText, []byte("0b1010")), false)
+	if len(bin.baseItems) != 3 || bin.baseItems[0].name != "八进制" || bin.baseItems[0].value != "0o12" ||
+		bin.baseItems[1].name != "十进制" || bin.baseItems[1].value != "10" ||
+		bin.baseItems[2].name != "十六进制" || bin.baseItems[2].value != "0xA" {
+		t.Fatalf("二进制数字应转换为其他三种进制: %+v", bin.baseItems)
+	}
+
+	oct := app.buildItemMenuInfo(NewClipItem(TypeText, []byte("0o17")), false)
+	if len(oct.baseItems) != 3 || oct.baseItems[0].name != "二进制" || oct.baseItems[0].value != "0b1111" ||
+		oct.baseItems[1].name != "十进制" || oct.baseItems[1].value != "15" ||
+		oct.baseItems[2].name != "十六进制" || oct.baseItems[2].value != "0xF" {
+		t.Fatalf("八进制数字应转换为其他三种进制: %+v", oct.baseItems)
+	}
+
+	for _, text := range []string{"hello", "12a", "12, 34, 56", ""} {
+		if info := app.buildItemMenuInfo(NewClipItem(TypeText, []byte(text)), false); len(info.baseItems) != 0 {
+			t.Fatalf("非数字文本不应生成转换项: %q %+v", text, info.baseItems)
+		}
+	}
+	if info := app.buildItemMenuInfo(NewClipItem(TypeImage, []byte("img")), false); len(info.baseItems) != 0 {
+		t.Fatalf("图片不应生成转换项: %+v", info.baseItems)
+	}
+
+	app.configBaseConvert.Store(false)
+	if info := app.buildItemMenuInfo(NewClipItem(TypeText, []byte("255")), false); len(info.baseItems) != 0 {
+		t.Fatalf("未开启进制转换时不应生成转换项: %+v", info.baseItems)
+	}
+}
+
 func TestCanAddToGroup(t *testing.T) {
 	resetTestLogChannel()
 	app := NewApp(NewAppLogger())

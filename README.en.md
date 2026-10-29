@@ -10,6 +10,7 @@ A system tray clipboard history manager supporting text/images, groups, translat
 - 📁 Group management for storing content by category
 - 🔍 Quick search through history
 - 🌈 Color format recognition and conversion (Hex ↔ RGB)
+- 🔢 Base conversion (binary / octal / decimal / hexadecimal)
 - 🌍 Baidu Translate / Youdao Translate integration
 - 🔐 Translator keys stored in the system credential store
 - 🌐 Real-time clipboard sharing over the LAN
@@ -71,8 +72,16 @@ Computer A: sees the reply [R] "Sure, what time?"
 ```
 1. Right click → Settings → Auto Recognize Colors ✓
 2. Copy #FF5733
-3. Right click the entry → shows "Copy Hex / Copy RGB" options
-4. Click to get 255,87,51
+3. Right click the entry → shows "Copy Hex / Copy RGB / Copy R / Copy G / Copy B" options
+4. Click to get #ff5733 / 255,87,51 / 255 / 87 / 51 respectively
+```
+
+### Base Conversion
+```
+1. Right click → Settings → Base Conversion ✓
+2. Copy 255 (or 0b/0o/0x prefixed binary/octal/hex numbers)
+3. Right click the entry → shows "Copy Binary: 0b11111111" and other options
+4. Click to get the value in the target base
 ```
 
 ### Translation
@@ -113,6 +122,7 @@ Common locations:
 - `search_menu_top`: Pin the Search menu to the top
 - `add_to_group`: Add entries to groups
 - `auto_recognize_color`: Auto recognize colors
+- `base_convert`: Base conversion
 - `save_log_to_local`: Save logs on exit
 - `highlight_prefix` / `highlight_suffix`: Characters wrapping search matches, defaults to 【 and 】
 - `time_format`: Entry time display format, any combination of YYYY YY MM DD HH mm ss, default hh:mm

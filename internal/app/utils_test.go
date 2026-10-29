@@ -60,6 +60,65 @@ func TestGetColor(t *testing.T) {
 	}
 }
 
+func TestParseBaseNumber(t *testing.T) {
+	cases := []struct {
+		text  string
+		value uint64
+		base  int
+		ok    bool
+	}{
+		{"0b1010", 10, 2, true},
+		{"0B1010", 10, 2, true},
+		{"0o17", 15, 8, true},
+		{"0O17", 15, 8, true},
+		{"0xFF", 255, 16, true},
+		{"0xff", 255, 16, true},
+		{"255", 255, 10, true},
+		{"0007", 7, 10, true},
+		{"0", 0, 10, true},
+		{"18446744073709551615", 18446744073709551615, 10, true},
+		{"0xFFFFFFFFFFFFFFFF", 18446744073709551615, 16, true},
+		{"0b2", 0, 0, false},
+		{"0o8", 0, 0, false},
+		{"0x", 0, 0, false},
+		{"0b", 0, 0, false},
+		{"12a", 0, 0, false},
+		{"-5", 0, 0, false},
+		{"12, 34, 56", 0, 0, false},
+		{"1 2", 0, 0, false},
+		{"1.5", 0, 0, false},
+		{"", 0, 0, false},
+		{"18446744073709551616", 0, 0, false},
+	}
+	for _, c := range cases {
+		value, base, ok := parseBaseNumber(c.text)
+		if ok != c.ok || (ok && (value != c.value || base != c.base)) {
+			t.Fatalf("解析 %q 错误: value=%d base=%d ok=%v", c.text, value, base, ok)
+		}
+	}
+}
+
+func TestFormatBaseValue(t *testing.T) {
+	cases := []struct {
+		value uint64
+		base  int
+		want  string
+	}{
+		{255, 2, "0b11111111"},
+		{255, 8, "0o377"},
+		{255, 10, "255"},
+		{255, 16, "0xFF"},
+		{0, 10, "0"},
+		{10, 2, "0b1010"},
+		{15, 16, "0xF"},
+	}
+	for _, c := range cases {
+		if got := formatBaseValue(c.value, c.base); got != c.want {
+			t.Fatalf("格式化错误: value=%d base=%d got %s, want %s", c.value, c.base, got, c.want)
+		}
+	}
+}
+
 func TestLoadMergedConfigMigratesLegacyConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	legacyDir := filepath.Join(tempDir, "legacy")
