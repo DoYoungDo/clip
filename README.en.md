@@ -11,6 +11,7 @@ A system tray clipboard history manager supporting text/images, groups, translat
 - 🔍 Quick search through history
 - 🌈 Color format recognition and conversion (Hex ↔ RGB)
 - 🔢 Base conversion (binary / octal / decimal / hexadecimal)
+- 🚀 Launch at login
 - 🌍 Baidu Translate / Youdao Translate integration
 - 🔐 Translator keys stored in the system credential store
 - 🌐 Real-time clipboard sharing over the LAN
@@ -104,6 +105,12 @@ Notes:
 1. Copy a keyword such as "password"
 2. Right click → 🔎 Search
 3. Only history entries containing "password" are shown
+```
+
+### Launch at Login
+```
+1. Right click → Settings → Launch at Login ✓
+2. Clip starts automatically when you log in
 ```
 
 ## Configuration

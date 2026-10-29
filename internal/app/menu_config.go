@@ -310,6 +310,9 @@ func (a *App) addConfigMenuAction() {
 		}
 	}
 
+	menu.AddSubMenuItemCheckbox("开机自启动", "开启后登录系统时自动启动 "+appName, autostartEnabled()).Click(func() {
+		a.toggleAutostart()
+	})
 	menu.AddSubMenuItem("打开配置文件目录", "打开配置文件和日志所在的系统目录").Click(func() {
 		openDir(getAppDataDir())
 	})
