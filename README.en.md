@@ -72,8 +72,8 @@ Computer A: sees the reply [R] "Sure, what time?"
 ```
 1. Right click → Settings → Auto Recognize Colors ✓
 2. Copy #FF5733
-3. Right click the entry → shows "Copy Hex / Copy RGB / Copy R / Copy G / Copy B" options
-4. Click to get #ff5733 / 255,87,51 / 255 / 87 / 51 respectively
+3. Right click the entry → the menu shows values like "Copy Hex: #ff5733", "Copy RGB: 255,87,51", "Copy R: 255"
+4. Click to copy the corresponding value
 ```
 
 ### Base Conversion

@@ -213,32 +213,23 @@ func itemMenuTooltip(item *ClipItem, info itemMenuInfo) string {
 	return formatMenuItemTooltip(item)
 }
 
-// addColorRecognizeMenuItems 添加"复制Hex / 复制RGB / 复制R / 复制G / 复制B"子菜单（颜色值来自已解析的 info）。
+// addColorRecognizeMenuItems 添加"复制Hex: xxx"等颜色子菜单，菜单直接展示转换结果（颜色值来自已解析的 info）。
 func (a *App) addColorRecognizeMenuItems(menu *systray.MenuItem, item *ClipItem, info itemMenuInfo) {
 	global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("识别颜色成功: %s,并添加菜单", string(item.Content))}
-
-	copyH := menu.AddSubMenuItem("复制Hex", "")
-	copyRGB := menu.AddSubMenuItem("复制RGB", "")
-	copyH.Click(func() {
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制Hex颜色: %s", info.colorHex)}
-		a.writer <- NewClipItem(TypeText, []byte(info.colorHex))
-	})
-	copyRGB.Click(func() {
-		global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("复制RGB颜色: %s", info.colorRGB)}
-		a.writer <- NewClipItem(TypeText, []byte(info.colorRGB))
-	})
 
 	for _, c := range []struct {
 		label string
 		value string
 	}{
+		{"复制Hex", info.colorHex},
+		{"复制RGB", info.colorRGB},
 		{"复制R", info.colorR},
 		{"复制G", info.colorG},
 		{"复制B", info.colorB},
 	} {
-		copyItem := menu.AddSubMenuItem(c.label, "")
+		copyItem := menu.AddSubMenuItem(fmt.Sprintf("%s: %s", c.label, c.value), "")
 		copyItem.Click(func() {
-			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("%s值: %s", c.label, c.value)}
+			global_log_channel <- LogEntry{Kind: KindInfo, Content: fmt.Sprintf("%s: %s", c.label, c.value)}
 			a.writer <- NewClipItem(TypeText, []byte(c.value))
 		})
 	}
