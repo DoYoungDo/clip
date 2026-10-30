@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"sync"
 	"testing"
+	"time"
 )
 
 func resetTestLogChannel() {
@@ -388,5 +389,115 @@ func TestHistoryRenameReplacesItem(t *testing.T) {
 	}
 	if history.Rename(nil, "x") {
 		t.Fatalf("nil 项应返回 false")
+	}
+}
+
+func TestClipItemRefStableAcrossClone(t *testing.T) {
+	item := NewClipItem(TypeText, []byte("hello"))
+	ref := item.Ref()
+	if ref == "" {
+		t.Fatalf("Ref 不应为空")
+	}
+	if item.Clone().Ref() != ref {
+		t.Fatalf("Clone 后 Ref 应保持一致")
+	}
+	if item.CloneToRemote().Ref() != ref {
+		t.Fatalf("CloneToRemote 后 Ref 应保持一致")
+	}
+}
+
+func TestHistoryFindByRef(t *testing.T) {
+	resetTestLogChannel()
+	history := NewHistory(10)
+	item := NewClipItem(TypeText, []byte("hello"))
+	history.Add(item)
+
+	if got := history.FindByRef(item.Ref()); got != item {
+		t.Fatalf("FindByRef 应返回目标条目")
+	}
+	if got := history.FindByRef("0:missing:1"); got != nil {
+		t.Fatalf("不存在的引用应返回 nil")
+	}
+	if got := history.FindByRef(""); got != nil {
+		t.Fatalf("空引用应返回 nil")
+	}
+}
+
+func TestHistoryDeleteByRef(t *testing.T) {
+	resetTestLogChannel()
+	history := NewHistory(10)
+
+	first := NewClipItem(TypeText, []byte("x"))
+	first.Time = first.Time.Add(-2 * time.Second)
+	other := NewClipItem(TypeText, []byte("y"))
+	other.Time = other.Time.Add(-1 * time.Second)
+	second := NewClipItem(TypeText, []byte("x"))
+	history.Add(first)
+	history.Add(other)
+	history.Add(second)
+
+	if first.Ref() == second.Ref() {
+		t.Fatalf("同内容不同时间的条目 Ref 应不同")
+	}
+
+	changes := 0
+	history.SetOnChange(func() { changes++ })
+
+	if !history.DeleteByRef(first.Ref()) {
+		t.Fatalf("按引用删除应成功")
+	}
+	if history.FindByRef(first.Ref()) != nil {
+		t.Fatalf("目标条目应被删除")
+	}
+	if history.FindByRef(second.Ref()) == nil {
+		t.Fatalf("相同内容的其他条目应保留")
+	}
+	if changes != 1 {
+		t.Fatalf("删除应触发一次变更回调, got %d", changes)
+	}
+
+	if history.DeleteByRef(first.Ref()) {
+		t.Fatalf("重复删除应返回 false")
+	}
+	if history.DeleteByRef("") {
+		t.Fatalf("空引用应返回 false")
+	}
+	if changes != 1 {
+		t.Fatalf("失败删除不应触发变更回调, got %d", changes)
+	}
+}
+
+func TestHistoryRenameByRef(t *testing.T) {
+	resetTestLogChannel()
+	history := NewHistory(10)
+	item := NewClipItem(TypeImage, []byte("image"))
+	history.Add(item)
+
+	changes := 0
+	history.SetOnChange(func() { changes++ })
+
+	if !history.RenameByRef(item.Ref(), "截图") {
+		t.Fatalf("按引用重命名应成功")
+	}
+
+	renamed := history.FindByRef(item.Ref())
+	if renamed == nil || renamed.Name != "截图" {
+		t.Fatalf("重命名后名称错误: %#v", renamed)
+	}
+	if renamed == item {
+		t.Fatalf("重命名应替换为新指针以避免并发读写")
+	}
+	if changes != 1 {
+		t.Fatalf("重命名应触发一次变更回调, got %d", changes)
+	}
+
+	if history.RenameByRef("0:missing:1", "x") {
+		t.Fatalf("不存在的引用重命名应返回 false")
+	}
+	if history.RenameByRef("", "x") {
+		t.Fatalf("空引用重命名应返回 false")
+	}
+	if changes != 1 {
+		t.Fatalf("失败重命名不应触发变更回调, got %d", changes)
 	}
 }

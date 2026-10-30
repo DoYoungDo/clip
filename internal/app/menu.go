@@ -157,6 +157,52 @@ func (a *App) canRenameImage(item *ClipItem) bool {
 	return item.Type == TypeImage && a.configImageRename.Load()
 }
 
+// colorValuesOf 将颜色文本解析为各格式值；不可识别时 ok=false。
+func colorValuesOf(text string) (hex string, rgb string, r string, g string, b string, ok bool) {
+	rs, gs, bs, base, ok := getColor(text)
+	if !ok {
+		return "", "", "", "", "", false
+	}
+
+	rt, _ := strconv.ParseInt(rs, base, 0)
+	gt, _ := strconv.ParseInt(gs, base, 0)
+	bt, _ := strconv.ParseInt(bs, base, 0)
+	return fmt.Sprintf("#%x%x%x", rt, gt, bt),
+		fmt.Sprintf("%d,%d,%d", rt, gt, bt),
+		strconv.FormatInt(rt, 10),
+		strconv.FormatInt(gt, 10),
+		strconv.FormatInt(bt, 10),
+		true
+}
+
+// baseConvertItemsOf 将数字文本解析为与源进制不同的转换项（顺序：二/八/十/十六）。
+func baseConvertItemsOf(text string) []baseConvertItem {
+	value, sourceBase, ok := parseBaseNumber(text)
+	if !ok {
+		return nil
+	}
+
+	items := make([]baseConvertItem, 0, 3)
+	for _, target := range []struct {
+		name string
+		base int
+	}{
+		{"二进制", 2},
+		{"八进制", 8},
+		{"十进制", 10},
+		{"十六进制", 16},
+	} {
+		if target.base == sourceBase {
+			continue
+		}
+		items = append(items, baseConvertItem{
+			name:  target.name,
+			value: formatBaseValue(value, target.base),
+		})
+	}
+	return items
+}
+
 // buildItemMenuInfo 一次性解析条目的右键菜单能力（颜色识别/重命名/删除/添加到分组）。
 func (a *App) buildItemMenuInfo(item *ClipItem, hasAdd bool) itemMenuInfo {
 	info := itemMenuInfo{
@@ -166,39 +212,18 @@ func (a *App) buildItemMenuInfo(item *ClipItem, hasAdd bool) itemMenuInfo {
 	}
 
 	if a.configAutoRecognizeColor.Load() && item.Type == TypeText {
-		if r, g, b, base, ok := getColor(string(item.Content)); ok {
+		if hex, rgb, r, g, b, ok := colorValuesOf(string(item.Content)); ok {
 			info.hasColor = true
-			rt, _ := strconv.ParseInt(r, base, 0)
-			gt, _ := strconv.ParseInt(g, base, 0)
-			bt, _ := strconv.ParseInt(b, base, 0)
-			info.colorHex = fmt.Sprintf("#%x%x%x", rt, gt, bt)
-			info.colorRGB = fmt.Sprintf("%d,%d,%d", rt, gt, bt)
-			info.colorR = strconv.FormatInt(rt, 10)
-			info.colorG = strconv.FormatInt(gt, 10)
-			info.colorB = strconv.FormatInt(bt, 10)
+			info.colorHex = hex
+			info.colorRGB = rgb
+			info.colorR = r
+			info.colorG = g
+			info.colorB = b
 		}
 	}
 
 	if a.configBaseConvert.Load() && item.Type == TypeText {
-		if value, base, ok := parseBaseNumber(string(item.Content)); ok {
-			for _, target := range []struct {
-				name string
-				base int
-			}{
-				{"二进制", 2},
-				{"八进制", 8},
-				{"十进制", 10},
-				{"十六进制", 16},
-			} {
-				if target.base == base {
-					continue
-				}
-				info.baseItems = append(info.baseItems, baseConvertItem{
-					name:  target.name,
-					value: formatBaseValue(value, target.base),
-				})
-			}
-		}
+		info.baseItems = baseConvertItemsOf(string(item.Content))
 	}
 
 	info.hasSub = info.canRename || info.hasColor || info.hasDelete || info.hasAdd || len(info.baseItems) > 0

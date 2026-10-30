@@ -310,6 +310,26 @@ func (a *App) addConfigMenuAction() {
 		}
 	}
 
+	a.manageServerMu.RLock()
+	manageServer := a.manageServer
+	a.manageServerMu.RUnlock()
+
+	if manageServer == nil {
+		menu.AddSubMenuItemCheckbox("网页管理", "开启后用网页管理历史记录与分组（仅本机访问），自动打开网页", false).Click(func() {
+			a.toggleManageServer()
+		})
+	} else {
+		manageMenu := menu.AddSubMenuItem(fmt.Sprintf("网页管理 (%v)", strings.TrimPrefix(manageServer.URL(), "http://")), "")
+		manageMenu.AddSubMenuItem("打开管理页面", "在浏览器中打开管理页面").Click(func() {
+			if err := openURL(manageServer.URL()); err != nil {
+				global_log_channel <- LogEntry{Kind: KindError, Content: fmt.Sprintf("打开管理页面失败: %v", err)}
+			}
+		})
+		manageMenu.AddSubMenuItem("停止网页管理", "停止网页管理，管理页面将无法访问").Click(func() {
+			a.toggleManageServer()
+		})
+	}
+
 	menu.AddSubMenuItemCheckbox("开机自启动", "开启后登录系统时自动启动 "+appName, autostartEnabled()).Click(func() {
 		a.toggleAutostart()
 	})

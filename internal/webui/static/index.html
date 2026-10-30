@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clip 网页管理</title>
+<script>
+  (function () {
+    var stored = localStorage.getItem("clip-theme") || "system";
+    var dark = stored === "dark" ||
+      (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  })();
+</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">📋 <strong>Clip</strong><span class="brand-sub">网页管理</span></div>
+  <div class="search-wrap">
+    <input id="search" type="search" placeholder="搜索历史记录..." autocomplete="off">
+  </div>
+  <div class="topbar-right">
+    <span id="conn" class="conn" title="实时连接状态"></span>
+    <button id="btn-theme" class="icon-btn" title="主题">💻</button>
+    <button id="btn-config" class="icon-btn" title="配置">⚙</button>
+  </div>
+</header>
+
+<main>
+  <aside class="sidebar">
+    <nav id="nav"></nav>
+    <button id="btn-new-group" class="new-group">＋ 新建分组</button>
+  </aside>
+
+  <section class="content">
+    <div class="toolbar">
+      <h2 id="list-title">全部历史</h2>
+      <span id="list-count" class="count"></span>
+      <span class="spacer"></span>
+      <button id="btn-clear" class="btn-danger-ghost" hidden>清空历史</button>
+    </div>
+    <div id="list" class="list"></div>
+    <div id="empty" class="empty" hidden>暂无记录</div>
+  </section>
+</main>
+
+<div id="drawer-mask" class="drawer-mask" hidden></div>
+<div id="config-panel" class="drawer" hidden>
+  <div class="drawer-head">
+    <h3>配置</h3>
+    <button id="btn-config-close" class="icon-btn" title="关闭">✕</button>
+  </div>
+  <div id="config-body" class="drawer-body"></div>
+</div>
+
+<div id="modal-mask" class="modal-mask" hidden></div>
+<div id="modal" class="modal" hidden></div>
+
+<div id="toast-root"></div>
+<script src="/app.js"></script>
+</body>
+</html>

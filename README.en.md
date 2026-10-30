@@ -12,6 +12,7 @@ A system tray clipboard history manager supporting text/images, groups, translat
 - 🌈 Color format recognition and conversion (Hex ↔ RGB)
 - 🔢 Base conversion (binary / octal / decimal / hexadecimal)
 - 🚀 Launch at login
+- 🌐 Web Management: manage history and groups in your browser (localhost only)
 - 🌍 Baidu Translate / Youdao Translate integration
 - 🔐 Translator keys stored in the system credential store
 - 🌐 Real-time clipboard sharing over the LAN
@@ -112,6 +113,17 @@ Notes:
 1. Right click → Settings → Launch at Login ✓
 2. Clip starts automatically when you log in
 ```
+
+### Web Management
+```
+1. Right click → Settings → Web Management ✓
+2. The management page opens in your browser (localhost only, http://127.0.0.1:random-port)
+3. Copy/delete entries, rename images, manage groups and adjust settings from the page
+4. Changes sync with the tray menu in real time; turn the switch off to stop the service
+```
+Notes:
+- Web Management only listens on localhost; other devices on the LAN cannot access it
+- New clipboard content and menu-side changes are pushed to the page in real time
 
 ## Configuration
 

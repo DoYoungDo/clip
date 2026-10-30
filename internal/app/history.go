@@ -124,6 +124,15 @@ func (c *ClipItem) Clone() *ClipItem {
 	}
 }
 
+// Ref 返回条目的稳定引用（类型:哈希:纳秒时间戳），供网页管理等外部组件在
+// 不持有内存指针的情况下定位条目；重复内容以时间戳区分。
+func (c *ClipItem) Ref() string {
+	if c == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d:%s:%d", c.Type, c.Hash, c.Time.UnixNano())
+}
+
 type History struct {
 	items    []*ClipItem
 	maxSize  uint
@@ -252,6 +261,75 @@ func (h *History) Rename(item *ClipItem, name string) bool {
 			renamed = true
 			break
 		}
+	}
+	h.mu.Unlock()
+
+	if renamed {
+		h.notifyChange()
+	}
+	return renamed
+}
+
+// findRefIndexLocked 在持锁状态下查找引用对应的条目索引；未找到返回 -1。
+func (h *History) findRefIndexLocked(ref string) int {
+	for i, existing := range h.items {
+		if existing != nil && existing.Ref() == ref {
+			return i
+		}
+	}
+	return -1
+}
+
+// FindByRef 按引用查找条目；不存在时返回 nil。
+func (h *History) FindByRef(ref string) *ClipItem {
+	if ref == "" {
+		return nil
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if index := h.findRefIndexLocked(ref); index >= 0 {
+		return h.items[index]
+	}
+	return nil
+}
+
+// DeleteByRef 按引用删除条目（查找与删除在锁内原子完成）；不存在时返回 false。
+func (h *History) DeleteByRef(ref string) bool {
+	if ref == "" {
+		return false
+	}
+
+	h.mu.Lock()
+	index := h.findRefIndexLocked(ref)
+	if index >= 0 {
+		h.items = append(h.items[:index], h.items[index+1:]...)
+	}
+	h.mu.Unlock()
+
+	if index < 0 {
+		return false
+	}
+
+	global_log_channel <- LogEntry{Kind: KindInfo, Content: "正在删除历史记录..."}
+	h.notifyChange()
+	return true
+}
+
+// RenameByRef 按引用重命名条目（替换指针，避免并发读写 item 字段）；不存在时返回 false。
+func (h *History) RenameByRef(ref string, name string) bool {
+	if ref == "" {
+		return false
+	}
+
+	h.mu.Lock()
+	renamed := false
+	if index := h.findRefIndexLocked(ref); index >= 0 {
+		replacement := h.items[index].Clone()
+		replacement.Name = name
+		h.items[index] = replacement
+		renamed = true
 	}
 	h.mu.Unlock()
 

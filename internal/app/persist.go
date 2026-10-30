@@ -23,7 +23,10 @@ func (s *atomicString) Store(v string) {
 }
 
 // requestSave 非阻塞地请求一次落盘，菜单事件回调调用它不会因写盘而卡顿。
+// 同时递增数据版本号，供网页管理感知数据变化（所有变更路径都会经过这里）。
 func (a *App) requestSave() {
+	a.dataVersion.Add(1)
+
 	if a.saveTrigger == nil {
 		return
 	}

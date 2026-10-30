@@ -26,6 +26,10 @@ type App struct {
 	shareServerMu  sync.RWMutex
 	shareClientsMu sync.RWMutex
 
+	manageServer   *ManageServer
+	manageServerMu sync.RWMutex
+	dataVersion    atomic.Uint64
+
 	translateMu     sync.Mutex
 	translator      translator.Translator
 	translateToLang translator.TransLang
@@ -374,6 +378,16 @@ func (a *App) shutdown() {
 		a.shareServerMu.Lock()
 		a.shareServer = nil
 		a.shareServerMu.Unlock()
+	}
+
+	a.manageServerMu.RLock()
+	manageServer := a.manageServer
+	a.manageServerMu.RUnlock()
+	if manageServer != nil {
+		manageServer.Stop()
+		a.manageServerMu.Lock()
+		a.manageServer = nil
+		a.manageServerMu.Unlock()
 	}
 
 	a.stopStateSaver()
